@@ -1,13 +1,15 @@
 import {Router} from 'express';
 import {CotizacionController} from "../Controller/CotizacionController"
+import { CambioDivisaController } from '../Controller/cambioDivisa';
 const router = Router();
-
-router.get('/cotizaciones', CotizacionController.obtenerCots);
+router.get('/tipo-cambio', CambioDivisaController.obtenerTipoCambio);
 router.get('/cotizaciones/mensual', CotizacionController.contarCot);
-router.get('/cotizaciones/buscar', CotizacionController.buscaryfiltrar);
+router.get('/cotizaciones/productos', CotizacionController.consultarProductoParaCotizacion);
+router.get('/cotizaciones', CotizacionController.buscaryfiltrar);
 router.post('/cotizaciones', CotizacionController.crearCotizacion);
 router.post('/cotizaciones/:id/convertir', CotizacionController.convertirCotizacion);
 router.get('/cotizaciones/:id', CotizacionController.obtenerCotId);
-router.put('/cotizaciones', CotizacionController.modificarCotizacion);
-router.delete('/cotizaciones', CotizacionController.cancelarCot);
+router.put('/cotizaciones/:id', CotizacionController.modificarCotizacion);
+router.delete('/cotizaciones/:id', CotizacionController.cancelarCot);
+router.get('/cotizaciones/:id/pdf', CotizacionController.descargarPDF);
 export default router;

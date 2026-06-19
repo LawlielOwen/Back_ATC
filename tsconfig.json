@@ -15,7 +15,7 @@
   },
   "include": [
     "**/*.ts"
-,       "Controller/ClienteController.ts"  ],
+,       "Controller/ClienteController.ts", "Controller/PlantillaCotizacion/PlantillaController.js"  ],
   "exclude": [
     "node_modules",
     "dist"
