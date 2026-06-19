@@ -46,9 +46,9 @@ static async solicitarVale(req: Request, res: Response) {
             // 2. WEBSOCKET: Avisar a los de Almacén y Administradores
             io.to('rol_Almacen').to('rol_Administrador').emit('nueva_notificacion', {
                 titulo: 'Nueva Solicitud',
-                mensaje: 'Se ha creado una nueva solicitud de vale de salida.'
+                mensaje: 'Se ha generado una nueva solicitud de vale de salida.'
             });
-
+           io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
             // 3. Responder al Asesor
             res.status(200).json(result);
         } catch (error: any) {
@@ -73,8 +73,9 @@ static async solicitarVale(req: Request, res: Response) {
                     titulo: 'Vale Aceptado',
                     mensaje: `Tu vale VS-${id} ha sido autorizado.`
                 });
+                io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
             }
-
+           io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
             // 3. Responder al Almacén
             res.status(200).json(result);
 
@@ -100,8 +101,9 @@ static async solicitarVale(req: Request, res: Response) {
                     titulo: 'Vale Rechazado',
                     mensaje: `Tu vale VS-${id} ha sido rechazado.`
                 });
+                io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
             }
-
+            io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
             // 3. Responder al Almacén
             res.status(200).json(result);
         } catch (error: any) {
@@ -132,7 +134,8 @@ static async solicitarVale(req: Request, res: Response) {
             if (!codigo) {
                 return res.status(400).json({ error: 'El código del producto es obligatorio' });
             }
-            const result = await ValeService.consultarProducto(codigo);
+            const id_proveedor = req.query.proveedor ? parseInt(req.query.proveedor as string) : null;
+            const result = await ValeService.consultarProducto(codigo, id_proveedor);
             if (result) {
                 res.status(200).json(result);
             } else {

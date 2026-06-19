@@ -2,6 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config({ override: true });
 import express, { Application} from 'express';
 
+// tarea prorgramada
+import { NotificacionesJob } from './Jobs/NotifJob';
+import { LimpiezaJob } from './Jobs/LimpiezaNotis';
 // WebSockets
 import http from 'http';
 import { Server } from 'socket.io';
@@ -16,6 +19,7 @@ import CotizacionRouter from './Router/Cotizacion'
 import MovimientosRouter from './Router/Movimientos';
 import ValesRouter from './Router/Vales';
 import NotificacionRouter from './Router/Notificacion';
+import ProveedorRouter from './Router/Proveedor';
 // Middleware
 import cors from 'cors';
 import { limiter } from './middleware/rate-limit';
@@ -43,10 +47,12 @@ app.use('/api', NotificacionRouter);
 app.use('/api', CotizacionRouter);
 app.use('/api', MovimientosRouter);
 app.use('/api', ValesRouter);
+app.use('/api', ProveedorRouter);
 app.use('/uploads', express.static(path.resolve('uploads')));
-
+NotificacionesJob.iniciarTareasProgramadas();
+LimpiezaJob.iniciarMantenimiento();
 io.on('connection', (socket) => {
-    console.log('Nuevo cliente conectado a notificaciones:', socket.id);
+    console.log('cliente conectado a notificaciones');
 
 socket.on('unirse_a_sala', (datosUsuario) => {
         
@@ -66,7 +72,7 @@ socket.on('unirse_a_sala', (datosUsuario) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('🔴 Cliente desconectado:', socket.id);
+        console.log(' Cliente desconectado');
     });
 });
 server.listen(3000, () => {

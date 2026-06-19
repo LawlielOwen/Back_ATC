@@ -15,6 +15,10 @@ export interface Cotizacion {
     nombre_prospecto: string;
     total_tipos_productos: number;
     total_piezas: number;
+    vigencia_dias: number;
+    moneda: string;
+    ciudad_destino: string;
+    contacto: string;
 }
 
 export interface DetalleCotizacion {
@@ -29,6 +33,8 @@ export interface DetalleCotizacion {
     cantidad_producto: number;
     precio_unitario_cotizado: number;
     subtotal_partida: number; 
+    extra_descripcion: string;
+    tiempo_entrega: string;
 }
 
 export interface CotizacionCompleta extends Cotizacion {

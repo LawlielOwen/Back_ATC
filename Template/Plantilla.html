@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { margin: 8mm; size: letter landscape; }
+        body { font-family: 'Arial', sans-serif; font-size: 9px; color: #000; margin: 0; padding: 0; }
+
+        /* ── ENCABEZADO PRINCIPAL: Logo | Datos empresa | SMC | Folio+Cotización ── */
+        .main-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 4px;
+}
+.header-left { 
+    width: 17%;  /* subió de 13% — esto es lo que realmente agranda el logo */
+    display: flex; 
+    align-items: center; 
+    padding-top: 18px;
+}
+.logo-atc { 
+    width: 100%; 
+    max-height: 120px; 
+    object-fit: contain; 
+}
+
+/* Se agregó padding-left para separar el texto del logo (evita el solape) */
+.header-info { width: 25%; line-height: 1.25; padding-top: 4px; padding-left: 12px; }
+.company-name { font-size: 9px; font-weight: bold; }
+.company-line { font-size: 8.5px; }
+.company-line.email { color: #0000ee; text-decoration: underline; }
+.company-line.rfc { color: #0000ee; }
+
+/* Ahora centrado dentro de su columna (más ancha) en vez de pegado a la izquierda */
+.header-smc { width: 28%; display: flex; align-items: center; justify-content: center; padding-top: 8px; }
+.smc-logo { max-width: 100%; max-height: 65px; object-fit: contain; }
+
+/* Columna más angosta para que quede más recogido a la derecha, como el original */
+
+.header-right { width: 22%; text-align: right; padding-top: 2px; }
+
+/* Se quita el text-align:right heredado y se mueve manualmente hacia la izquierda */
+.folio-line { 
+    font-size: 8.5px; 
+    line-height: 1.4; 
+    text-align: left;
+    margin-left: 5px; 
+    font-weight: bold;
+}
+.folio-num { 
+    font-size: 8.5px; 
+    line-height: 1.4; 
+    text-align: left;
+    margin-left: -48px; 
+     font-weight: bold;
+}
+.folio-bold { font-weight: bold; color: #db1c1c; }
+.fecha-valor {
+    font-weight: normal;
+}
+.txt-cotizacion-italic { 
+    font-style: italic; 
+    font-weight: bold; 
+    font-size: 10px; 
+    margin-top: 10px; 
+    text-align: left; 
+        margin-left: -30px; 
+
+}
+
+/* Más espacio antes del enlace para que baje, como en el original */
+.txt-web { 
+    color: #0000ee; 
+    font-weight: bold; 
+    font-size: 11px; 
+    margin-top: 12px; 
+    text-align: left;
+    margin-left: 75px;
+}
+        /* ── BLOQUE COMPLETO CON BORDE: Distribuidor + Banner + Ciudades ── */
+        .header-block {
+            border: 1px solid #000;
+        }
+
+        .distribuidor-bar {
+            background-color: #c7c1c1;
+            text-align: center;
+            font-weight: bold;
+            font-size: 9px;
+            padding: 2px 0;
+            border-bottom: 1px solid #000;
+        }
+
+        .brands-bar {
+            padding: 4px 6px;
+            text-align: center;
+            border-bottom: 1px solid #000;
+        }
+        .brand-banner { width: 100%; height: auto; display: block; object-fit: contain; }
+
+        .cities-bar {
+            background-color: #c7c1c1;
+            display: flex;
+            justify-content: space-around;
+            font-size: 8px;
+            font-weight: bold;
+            color: #003B8A;
+            padding: 2px 0;
+        }
+
+        /* ── TABLA CLIENTE / CONTACTO ATC ── */
+   /* ── CONTENEDOR: dos cajas separadas con espacio entre ellas ── */
+.client-contact-wrapper {
+    display: flex;
+    gap: 0px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+}
+
+.client-box, .contact-box {
+    flex: 1;
+    border: 1px solid #000;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.client-col {
+    width: 60%; /* Le damos más espacio al cliente */
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-col {
+    width: 40%; /* Hacemos más pequeña la del asesor */
+    display: flex;
+    flex-direction: column;
+}
+
+.section-title {
+    text-align: center;
+    font-weight: bold;
+    font-style: italic;
+    font-size: 9px;
+    padding-bottom: 2px;
+}
+.title-left {
+    text-align: left;
+    padding-left: 5%; /* Puedes subir o bajar este porcentaje para moverlo más a la izquierda o derecha */
+}
+.header-cell {
+    text-align: center;
+    font-weight: bold;
+    font-style: italic;
+    font-size: 9px;
+    padding: 2px;
+}
+
+.data-cell { 
+    padding: 0px 10px 4px;
+}
+
+.kv-table, .kv-table-right { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+.kv-table td, .kv-table-right td { padding: 1px 4px; border: none; }
+.kv-label { font-weight: bold; width: 18%; white-space: nowrap; }
+.kv-value { width: 82%; }
+.kv-label-right { font-weight: bold; width: 45%; white-space: nowrap; text-align: right; }
+.kv-value-right { width: 78%; }
+
+/* ── TABLA PRINCIPAL DE PRODUCTOS ── */
+        .items-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 0; 
+            border-bottom: 0.5px solid #000; 
+            table-layout: fixed; 
+        }
+        
+        .items-table th { 
+            border: 0.5px solid #000; /* Bordes ultra delgados */
+            padding: 4px 3px; 
+            text-align: center !important; 
+            vertical-align: middle; 
+            font-size: 8px; 
+            font-weight: bold; 
+            background-color: #fff;
+        }
+
+        .items-table td { 
+            border-left: 0.5px solid #000; 
+            border-right: 0.5px solid #000; 
+            border-top: none; 
+            border-bottom: none; 
+            padding: 3px 4px; 
+            text-align: center; 
+            vertical-align: top; 
+            font-size: 8.5px; 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            white-space: normal;
+        }
+        .col-item { width: 6%; }
+        .col-cant { width: 6%; }
+        .col-codigo { width: 8%; }
+        .col-desc { width: 16%; text-align: center !important; } /* <-- Más reducido */
+        .col-extra { width: 24%; text-align: center !important; }
+        .col-tiempo { width: 18%; } /* <-- Mucho más amplio */
+        .col-precio { width: 10%; text-align: right !important; }
+        .col-total { width: 10%; text-align: right !important; font-weight: bold; }
+.items-table td:nth-child(7), 
+        .items-table td:nth-child(8) {
+            text-align: right !important;
+            padding-right: 6px; /* Da un pequeño respiro para que el número no pegue con la raya */
+        }
+     /* ── TOTALES Y PIE DE PÁGINA ── */
+        .footer-wrapper { 
+            display: flex; 
+            justify-content: space-between; 
+            width: 100%; 
+            margin-top: 0px; 
+        }
+        
+        .footer-left { 
+            width: 80%; /* Hasta la línea de T. Entrega */
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between;
+        }
+        
+        .footer-right { 
+            width: 20%; /* El espacio de P.UNITARIO y TOTAL */
+            display: flex; 
+            flex-direction: column; 
+            justify-content: flex-start; /* Para que la caja verde quede abajo pero despegada */
+        }
+
+        /* Caja verde fosforescente de condiciones */
+        .box-green-cond { 
+            background-color: #66FF66; 
+            border: 0.5px solid #000; 
+            border-top: none; 
+            text-align: center; 
+            padding: 4px; 
+            font-size: 10px; 
+            line-height: 1.3; 
+        }
+
+        /* Fila de firmas y correos */
+        .footer-bottom-flex { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-end; 
+            margin-top: 15px; 
+        }
+        
+        .f-notes { width: 25%; font-size: 8px; font-style: italic; font-weight: bold; }
+        .f-atte { width: 35%; text-align: center; font-size: 8px; line-height: 1.2; }
+        .f-solicita { width: 40%; text-align: center; padding-bottom: 2px; }
+
+        /* Textos de colores */
+        .txt-red { color: red; font-weight: bold; font-size: 9px; margin-bottom: 2px; }
+        .txt-email { color: blue; font-weight: bold; font-size: 11px; }
+
+        /* Tabla de Totales SIN BORDES a la izquierda */
+        .totals-table { width: 100%; border-collapse: collapse; }
+        .totals-table td { padding: 3px 4px; font-size: 9px; }
+        
+        /* La etiqueta (SUBTOTAL, IVA, TOTAL) NO tiene bordes */
+        .totals-table .lbl { 
+            font-weight: bold; 
+            text-align: right; 
+            width: 50%; /* La mitad de ese 20% total, equivalente a P.UNITARIO */
+            border: none; 
+        }
+        
+        /* La caja del valor SÍ tiene bordes (como en tu imagen) */
+        .totals-table td.val-container { 
+            padding: 0; 
+            border: 0.5px solid #000; 
+            border-top: none; /* Porque ya lo tiene la tabla de arriba */
+            width: 50%; /* Equivalente a la columna TOTAL */
+        }
+        
+        /* Ajuste si quieres que el IVA y el TOTAL sí tengan borde superior entre ellos */
+        .totals-table tr:nth-child(2) td.val-container, 
+        .totals-table tr:nth-child(3) td.val-container {
+            border-top: 0.5px solid #000;
+        }
+
+        .val-inner { display: flex; justify-content: space-between; width: 100%; padding: 3px 4px; box-sizing: border-box; }
+
+        /* Caja verde militar de Moneda */
+        .box-green-currency { 
+            background-color: #92D050; 
+            text-align: right; 
+            font-weight: bold; 
+            font-size: 9px; 
+            padding: 4px 6px; 
+            margin-top: 15px; /* Para despegarla un poco de los totales */
+        }
+        .font-bold { font-weight: bold; }
+        /* ── CAJA DE TÉRMINOS Y CONDICIONES FINALES ── */
+        .terms-box {
+            border: 0.5px solid #000;
+            border-radius: 8px; /* Esto hace las esquinas curvas */
+            padding: 8px 12px;
+            margin-top: 15px; /* Espacio para separarlo del bloque de totales de arriba */
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 8.5px;
+            line-height: 1.4;
+        }
+        
+        .terms-line {
+            margin: 0 0 2px 0; /* Pequeño salto entre líneas */
+        }
+        
+        .terms-bold {
+            font-weight: bold;
+            margin-top: 6px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-header">
+        <div class="header-left">
+             <img src="{{logo_atc_base64}}" class="logo-atc"> 
+         <!---    <img src="../assets/logo_atc.png" class="logo-atc">-->
+        </div>
+        <div class="header-info">
+            <div class="company-name">AUTOMATIZACION, TECNOLOGIA Y CONTROL S.A. DE C.V.</div>
+            <div class="company-line">AVENIDA CONVENCION DE 1914, PTE. 1132-6</div>
+            <div class="company-line">LA BARRANCA DE GUADALUPE</div>
+            <div class="company-line">TEL / FAX (449) 978-86-10, 978-86-11</div>
+            <div class="company-line rfc">RFC: ATC-120605-E70</div>
+<div class="company-line email">jmadrigal@atcmx.com.mx</div>
+        </div>
+        <div class="header-smc">
+             <img src="{{smc_base64}}" class="smc-logo">
+           <!---   <img src="../assets/smc.png" class="smc-logo">-->
+        </div>
+        <div class="header-right">
+            <div class="folio-num">Num. de cotización : <span class="folio-bold">{{num_cotizacion}}</span></div>
+<div class="folio-line">Fecha : <span class="fecha-valor">{{fecha}}</span></div>
+            <div class="txt-cotizacion-italic">COTIZACION</div>
+            <div class="txt-web">WWW.ATCMX.COM.MX</div>
+        </div>
+    </div>
+
+    <div class="header-block">
+        <div class="distribuidor-bar">DISTRIBUIDOR OFICIAL</div>
+
+        <div class="brands-bar">
+         <img src="{{banner_marcas_base64}}" class="brand-banner">  
+        <!--   <img src="../assets/banner.png" class="brand-banner"> --> 
+        </div>
+
+        <div class="cities-bar">
+            <span>AGUASCALIENTES</span>
+            <span>SAN LUIS POTOSI</span>
+            <span>ZACATECAS</span>
+            <span>LEON</span>
+            <span>IRAPUATO</span>
+            <span>QUERETARO</span>
+        </div>
+    </div>
+
+   <div class="client-contact-wrapper">
+
+    <div class="client-col">
+        <div class="section-title">CLIENTE</div>
+        <div class="client-box">
+            <div class="data-cell">
+                <table class="kv-table">
+                    <tr><td class="kv-label">Nombre:</td><td class="kv-value">{{nombre_cliente}}</td></tr>
+                    <tr><td class="kv-label">Direccion:</td><td class="kv-value">{{direccion_cliente}}</td></tr>
+                    <tr><td class="kv-label">Contacto:</td><td class="kv-value">{{contacto}}</td></tr>
+                    <tr><td class="kv-label">Ciudad:</td><td class="kv-value">{{ciudad_destino}}</td></tr>
+                    <tr><td class="kv-label">Tel/Fax:</td><td class="kv-value">{{telfax_cliente}}</td></tr>
+                    <tr><td class="kv-label">E-Mail:</td><td class="kv-value">{{email_cliente}}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="contact-col">
+        <div class="section-title title-left">CONTACTO ATC</div>
+        <div class="contact-box">
+            <div class="data-cell">
+               <table class="kv-table-right">
+    <tr><td class="kv-label-right">Asesor de Ventas:</td><td class="kv-value-right font-bold">{{nombre_asesor}}</td></tr>
+    <tr><td class="kv-label-right">Direccion:</td><td class="kv-value-right">BLVD. TORRES LANDA OTE. # 29078 INT 8</td></tr>
+    <tr><td class="kv-label-right"></td><td class="kv-value-right">COLONIA AZTECA C.P. 37520</td></tr>
+    <tr><td class="kv-label-right"></td><td class="kv-value-right">LEON GUANAJUATO</td></tr>
+    <tr><td class="kv-label-right">Tel:</td><td class="kv-value-right font-bold">{{tel_asesor}}</td></tr>
+    <tr><td class="kv-label-right">Tel/Fax:</td><td class="kv-value-right">(449) 978-86-10, 978-86-11, 978-63-67</td></tr>
+</table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th class="col-item">ITEM</th>
+                <th class="col-cant">CANTIDAD</th>
+                <th class="col-codigo">CODIGO INTERNO</th>
+                <th class="col-desc">DESCRIPCION</th>
+                <th class="col-extra">EXTRA DESCRIPCION</th>
+                <th class="col-tiempo">T. ENTREGA</th>
+                <th class="col-precio">P.UNITARIO</th>
+                <th class="col-total">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{filas_productos}}
+        </tbody>
+    </table>
+
+   <div class="footer-wrapper">
+        
+        <div class="footer-left">
+            <div class="box-green-cond">
+                Esta propuesta comercial se cotiza tal y como lo solicito el cliente. En caso que la PO no coincida con los códigos solicitados por el cliente, ATC no aceptará devoluciones. Favor de corroborar si los códigos solicitados están correctos antes de generar la orden de compra.
+            </div>
+            
+            <div class="footer-bottom-flex">
+                <div class="f-notes">Notas o Comentarios:</div>
+                <div class="f-atte">
+                    <b>ATTE:</b><br>
+                    {{nombre_asesor}}<br>
+                    <b>VENTAS Y SOPORTE TECNICO</b>
+                </div>
+                <div class="f-solicita">
+                    <div class="txt-red">SOLICITA TU COTIZACION A:</div>
+                    <div class="txt-email">cotizaciones@atcmx.com.mx</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-right">
+            <table class="totals-table">
+                <tr>
+                    <td class="lbl">SUBTOTAL</td>
+                    <td class="val-container">
+                        <div class="val-inner"><span>$</span> <span>{{subtotal}}</span></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="lbl">IVA</td>
+                    <td class="val-container">
+                        <div class="val-inner"><span>$</span> <span>{{iva}}</span></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="lbl">TOTAL</td>
+                    <td class="val-container font-bold">
+                        <div class="val-inner"><span>$</span> <span>{{total}}</span></div>
+                    </td>
+                </tr>
+            </table>
+            
+            <div class="box-green-currency">
+                {{moneda_texto}}
+            </div>
+        </div>
+        
+    </div>
+<div class="terms-box">
+        <div class="terms-line">1.- Cualquier alteración a esta cotización invalida su autenticidad.</div>
+        <div class="terms-line">2.- Sirvase enviarnos una "orden de compra" o "pedido" para solicitar la adquisición parcial o total del equipo cotizado.</div>
+        <div class="terms-line">3.- Esta cotización tiene una vigencia de {{vigencia_dias}} dias a partir de la fecha de entrega al cliente.</div>
+        <div class="terms-line">4.- Precios sujetos a cambio sin previo aviso.</div>
+        <div class="terms-bold">NO SE ACEPTA CANCELACIONES NI DEVOLUCIONES DE NINGUN TIPO</div>
+    </div>
+</body>
+</html>

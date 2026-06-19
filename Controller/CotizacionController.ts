@@ -13,13 +13,20 @@ export class CotizacionController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-    static async crearCotizacion(req: Request, res: Response) {
+   static async crearCotizacion(req: Request, res: Response) {
         try {
             const cotizacionData = req.body;
-            if (!cotizacionData.detalles || cotizacionData.detalles.length === 0) {
-                return res.status(400).json({ error: 'La cotización debe tener al menos un producto' });
+
+            if (!cotizacionData.id_asesor) {
+                return res.status(400).json({ error: 'El ID del asesor es obligatorio para generar la cotización.' });
             }
+
+            if (!cotizacionData.detalles || cotizacionData.detalles.length === 0) {
+                return res.status(400).json({ error: 'La cotización debe tener al menos un producto.' });
+            }
+
             const idNuevaCotizacion = await CotizacionService.guardarCotizacion(cotizacionData);
+            
             res.status(200).json({
                 mensaje: 'Cotización guardada con éxito',
                 id_cotizacion: idNuevaCotizacion
@@ -48,22 +55,17 @@ export class CotizacionController {
             res.status(500).json({ error: 'Error interno del servidor al modificar la cotización' });
         }
     }
-    static async convertirCotizacion(req: Request, res: Response) {
+   static async convertirCotizacion(req: Request, res: Response) {
         try {
             const idCotizacion = parseInt(req.params.id as string);
-            const { id_asesor, fecha_limite } = req.body;
+            
             if (!idCotizacion || isNaN(idCotizacion)) {
                 return res.status(400).json({ error: 'ID de cotización inválido o no proporcionado' });
             }
 
-            if (!id_asesor || !fecha_limite) {
-                return res.status(400).json({ error: 'Faltan datos obligatorios: id_asesor, fecha_actual o fecha_limite' });
-            }
-            const resultado = await CotizacionService.convertirAPedido(
-                idCotizacion,
-                parseInt(id_asesor),
-                fecha_limite
-            );
+            // Ya no requerimos id_asesor ni fecha_limite del body
+            const resultado = await CotizacionService.convertirAPedido(idCotizacion);
+            
             res.status(200).json(resultado);
 
         } catch (error: any) {
@@ -115,15 +117,51 @@ export class CotizacionController {
         try {
             const busqueda = (req.query.busqueda as string) || ''; 
             const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;         
-            const fecha =  (req.query.fecha as string) || null;
+            const fechaInicio = req.query.fechaInicio as string || null;
+            const fechaFin = req.query.fechaFin as string || null;
             const ordenTotal = (req.query.ordenTotal as string) || '';            
             const pagina = parseInt(req.query.pagina as string) || 1;
             const limite = parseInt(req.query.limite as string) || 9;          
-            const result = await CotizacionService.BuscaryFiltrar(busqueda, estatus, fecha, ordenTotal, pagina, limite);
+            const result = await CotizacionService.BuscaryFiltrar(busqueda, estatus,fechaInicio, fechaFin, ordenTotal, pagina, limite);
             res.status(200).json(result);         
         } catch (error: any) {
             console.error(error);
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
+    static async consultarProductoParaCotizacion(req: Request, res: Response) {
+        try {
+            const busqueda = req.query.busqueda as string;   
+            if (!busqueda) {
+                return res.status(400).json({ error: 'El término de búsqueda es obligatorio' });
+            }      
+            const id_proveedor = req.query.proveedor ? parseInt(req.query.proveedor as string) : null;   
+            const resultados = await CotizacionService.buscarProductos(busqueda, id_proveedor);
+            res.status(200).json({ 
+                productos: resultados 
+            });
+            
+        } catch (error: any) {
+            console.error('Error al buscar productos para cotizar:', error);
+            res.status(500).json({ error: 'Error interno del servidor al buscar el producto' });
+        }
+    }
+   static async descargarPDF(req: Request, res: Response) {
+    try {
+        // Tomamos el ID directo de los parámetros y usamos 'any' para evitar conflictos de TypeScript
+        const idCotizacion: any = req.params.id;
+        
+        const pdfBuffer = await CotizacionService.generarPDFCotizacion(idCotizacion);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Cotizacion_${idCotizacion}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        // Enviamos el buffer binario
+        res.end(pdfBuffer);
+    } catch (error: any) {
+        console.error('Error generando PDF:', error);
+        res.status(500).json({ error: 'Error al generar el documento PDF' });
+    }
+}
 }

@@ -71,11 +71,11 @@ export class ValeService {
         const [rows]: any = await pool.query('select * from verVales where id_vale = ?', [id]);
         return rows[0];
     }
-static async consultarProducto(codigo: string) {
-        const codigoLimpio = codigo.trim(); 
-        const [rows]: any = await pool.query('call sp_buscar_producto_para_vale(?)', [codigoLimpio]);
-        return rows[0];
-    }
+static async consultarProducto(codigo: string, id_proveedor: number | null = null) {
+    const codigoLimpio = codigo.trim(); 
+    const [rows]: any = await pool.query('call sp_buscar_producto_para_vale(?, ?)', [codigoLimpio, id_proveedor]);
+    return rows[0];
+}
     static async obtenerDetallesVale(id: number) {
         const [rows]: any = await pool.query('CALL sp_obtener_productos_vale(?)', [id]);
         return rows[0];

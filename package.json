@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.18.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -21,9 +22,11 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "mysql2": "^3.22.3",
+    "node-cron": "^4.2.1",
     "pdf-extraction": "^1.0.2",
     "pdfjs-dist": "^3.11.174",
     "pdfreader": "^3.0.8",
+    "puppeteer": "^25.1.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
@@ -34,7 +37,9 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.6.2",
+    "@types/node-cron": "^3.0.11",
     "@types/pdf-parse": "^1.1.5",
+    "@types/puppeteer": "^5.4.7",
     "nodemon": "^3.1.14",
     "ts-node-dev": "^2.0.0"
   }
