@@ -113,16 +113,29 @@ export class CotizacionController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-  static async buscaryfiltrar(req: Request, res: Response) {
+static async buscaryfiltrar(req: Request, res: Response) {
         try {
             const busqueda = (req.query.busqueda as string) || ''; 
-            const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;         
-            const fechaInicio = req.query.fechaInicio as string || null;
-            const fechaFin = req.query.fechaFin as string || null;
-            const ordenTotal = (req.query.ordenTotal as string) || '';            
+            const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;        
+            
+            // Retomamos fechaInicio y fechaFin
+            const fechaInicio = (req.query.fechaInicio as string) || null;
+            const fechaFin = (req.query.fechaFin as string) || null;
+            
+            const ordenTotal = (req.query.ordenTotal as string) || null;            
             const pagina = parseInt(req.query.pagina as string) || 1;
             const limite = parseInt(req.query.limite as string) || 9;          
-            const result = await CotizacionService.BuscaryFiltrar(busqueda, estatus,fechaInicio, fechaFin, ordenTotal, pagina, limite);
+            
+            const result = await CotizacionService.BuscaryFiltrar(
+                busqueda, 
+                estatus, 
+                fechaInicio, 
+                fechaFin, 
+                ordenTotal, 
+                pagina, 
+                limite
+            );
+            
             res.status(200).json(result);         
         } catch (error: any) {
             console.error(error);

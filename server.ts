@@ -20,9 +20,11 @@ import MovimientosRouter from './Router/Movimientos';
 import ValesRouter from './Router/Vales';
 import NotificacionRouter from './Router/Notificacion';
 import ProveedorRouter from './Router/Proveedor';
+import PedidosRouter from './Router/pedidos';
+import MetricasRouter from './Router/Metricas';
 // Middleware
 import cors from 'cors';
-import { limiter } from './middleware/rate-limit';
+import { standardLimiter, loginLimiter, searchLimiter } from './middleware/rate-limit';
 import helmet from 'helmet';
 const app: Application = express();
 const server = http.createServer(app);
@@ -36,9 +38,14 @@ export const io = new Server(server, {
     }
 })
 app.use(express.json());
-app.use('/api/', limiter);
-app.use('/api/health', healthRouter);
+app.use('/api/login', loginLimiter); 
+app.use('/api/asesores/registro', loginLimiter);
+
+app.use('/api/metricas', searchLimiter);
+app.use('/api', standardLimiter);
 app.use('/api', LoginRouter);
+app.use('/api', MetricasRouter);
+app.use('/api', healthRouter);
 app.use('/api', ClienteRouter);
 app.use('/api', AsesoresRouter);
 app.use('/api', ProductosRouter);
@@ -48,20 +55,19 @@ app.use('/api', CotizacionRouter);
 app.use('/api', MovimientosRouter);
 app.use('/api', ValesRouter);
 app.use('/api', ProveedorRouter);
+app.use('/api', PedidosRouter);
+
 app.use('/uploads', express.static(path.resolve('uploads')));
-NotificacionesJob.iniciarTareasProgramadas();
 LimpiezaJob.iniciarMantenimiento();
 io.on('connection', (socket) => {
     console.log('cliente conectado a notificaciones');
 
 socket.on('unirse_a_sala', (datosUsuario) => {
         
-        // 🛡️ PARCHE: Si los datos llegan como texto (como desde Postman), los convertimos a JSON real
         if (typeof datosUsuario === 'string') {
             try { datosUsuario = JSON.parse(datosUsuario); } catch (e) { }
         }
 
-        // 🛡️ EL ESCUDO: Verificamos que traiga datos, id y rol
         if (datosUsuario && datosUsuario.id && datosUsuario.rol) {
             socket.join(`usuario_${datosUsuario.id}`);
             socket.join(`rol_${datosUsuario.rol}`);
