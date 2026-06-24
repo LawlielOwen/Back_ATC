@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
+
 const { leerPdfSat } = require('./pdfHelper.js');
 // Importación limpia, ahora sí permitida por el tsconfig
 import pdfParse = require('pdf-parse');
@@ -33,9 +34,8 @@ export class ClienteController {
         }
     }
 
-    static async agregarCliente(req: any, res: Response) {
+   static async agregarCliente(req: any, res: Response) {
         try {
-
             const cliente = { ...req.body };
             if (req.file) {
                 cliente.nombre_constancia = req.file.originalname;
@@ -44,23 +44,47 @@ export class ClienteController {
                 cliente.nombre_constancia = '';
                 cliente.ruta_constancia = '';
             }
+
             const result = await ClienteService.agregarCliente(cliente);
-            res.status(201).json(result);
+            return res.status(201).json(result);
+
         } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+            console.error('Error al agregar cliente:', error);
+            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+
+            if (error.message && error.message.includes('FORMATO_INVALIDO')) {
+                return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
+            }
+            if (error.message === 'File too large') {
+                return res.status(400).json({ error: 'La constancia es demasiado grande. El límite es 5MB.' });
+            }
+
+            return res.status(500).json({ error: 'Error interno del servidor al agregar cliente' });
         }
     }
 
-    static async actualizarCliente(req: Request, res: Response) {
+    static async actualizarCliente(req: any, res: Response) {
         try {
             const id = parseInt(req.params.id as string);
-            const cliente = req.body;
+            const cliente = { ...req.body };
+
+            // Lógica añadida: Si el usuario sube un archivo NUEVO durante la edición
+            if (req.file) {
+                cliente.nombre_constancia = req.file.originalname;
+                cliente.ruta_constancia = req.file.path;
+            } else {
+                // Si no suben archivo, mantenemos los que vienen en el body (si existían)
+                cliente.nombre_constancia = req.body.nombre_constancia || '';
+                cliente.ruta_constancia = req.body.ruta_constancia || '';
+            }
+
             const result = await ClienteService.actualizarCliente(id, cliente);
             res.status(200).json(result);
         } catch (error: any) {
             console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+            res.status(500).json({ error: 'Error interno del servidor al actualizar cliente' });
         }
     }
 

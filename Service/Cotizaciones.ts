@@ -133,21 +133,30 @@ export class CotizacionService {
         const [rows]: any = await pool.query(query, [id]);
         return rows;
     }
-    static async BuscaryFiltrar(busqueda: string, estatus: number = -1,
-        fechaInicio: string | null, fechaFin: string | null, ordenTotal: string = '',
-        pagina: number = 1, limite: number = 10) {
+    static async BuscaryFiltrar(
+        busqueda: string,
+        estatus: number = -1,
+        fechaInicio: string | null,
+        fechaFin: string | null,
+        ordenTotal: string | null,
+        pagina: number = 1,
+        limite: number = 10
+    ) {
+
+        const offset = (pagina - 1) * limite;
+
         const [rows]: any = await pool.query('CALL sp_buscar_filtrar_cotizaciones(?, ?, ?, ?, ?, ?, ?)', [
             busqueda,
             estatus,
             fechaInicio,
             fechaFin,
             ordenTotal,
-            pagina,  // Mandamos la página
-            limite   // Mandamos el límite
+            limite,
+            offset
         ]);
 
         const cot = rows[0];
-        const total = rows[1][0].total;
+        const total = rows[1] ? rows[1][0].total : 0;
 
         return {
             cot: cot,
@@ -166,7 +175,7 @@ export class CotizacionService {
 
             const [rows]: any = await connection.query('SELECT @nuevo_pedido AS id_pedido, @mensaje_res AS mensaje');
             const resultado = rows[0];
-            
+
             if (resultado.id_pedido === -1) {
                 throw new Error(resultado.mensaje);
             }
@@ -190,7 +199,7 @@ export class CotizacionService {
         ]);
         return rows[0];
     }
-    static async generarPDFCotizacion(id_cotizacion: number) { 
+    static async generarPDFCotizacion(id_cotizacion: number) {
         const connection = await pool.getConnection();
         try {
             // 1. Obtener datos principales de la cotización y cliente
@@ -198,7 +207,7 @@ export class CotizacionService {
                 SELECT c.*, 
                        COALESCE(cl.Nombre, c.nombre_prospecto) AS nombre_cliente_final,
                        cl.Direccion, 
-                       cl.telefono AS telfax_cliente,
+                       cl.contacto_principal AS telfax_cliente,
                        cl.correo_contacto AS email_cliente,
                        CONCAT(a.Nombre, ' ', a.app) AS nombre_asesor,
                        a.telefono AS tel_asesor
@@ -221,7 +230,7 @@ export class CotizacionService {
 
             // 3. Armar las filas de la tabla
             let filasHtml = '';
-            
+
             // Verificamos si es USD y si hay un tipo de cambio válido (mayor a 0)
             const esUSD = cot.moneda === 'USD';
             const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
@@ -229,7 +238,7 @@ export class CotizacionService {
             detalles.forEach((item: any, index: number) => {
                 const precioUnitarioConvertido = Number(item.precio_unitario_cotizado) / factorConversion;
                 const subtotalLineaConvertido = (item.cantidad_producto * Number(item.precio_unitario_cotizado)) / factorConversion;
-                
+
                 filasHtml += `
                 <tr>
                     <td>${index + 1}</td>
@@ -295,8 +304,7 @@ export class CotizacionService {
             const page = await browser.newPage();
 
             // Cargamos el HTML en la página invisible
-            await page.setContent(htmlListo, { waitUntil: 'networkidle0' });
-
+await page.setContent(htmlListo, { waitUntil: 'load' });
             // "Imprimimos" a PDF respetando fondos (printBackground: true)
             const pdfBuffer = await page.pdf({
                 format: 'Letter',
