@@ -57,7 +57,7 @@ app.use('/api', ValesRouter);
 app.use('/api', ProveedorRouter);
 app.use('/api', PedidosRouter);
 
-app.use('/uploads', express.static(path.resolve('uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 LimpiezaJob.iniciarMantenimiento();
 io.on('connection', (socket) => {
     console.log('cliente conectado a notificaciones');

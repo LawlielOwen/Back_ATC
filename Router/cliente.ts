@@ -5,7 +5,9 @@ import fs from 'fs';
 import path from 'path';
 const router = Router();
 
-const csfDir = path.join(__dirname, '../../uploads/CSF'); // Ajusta los '../' según tu estructura
+// Ajusta los '../' según tu estructura
+const csfDir = path.join(process.cwd(), 'uploads/CSF');
+
 if (!fs.existsSync(csfDir)) {
     fs.mkdirSync(csfDir, { recursive: true });
 }
