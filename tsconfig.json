@@ -17,7 +17,7 @@
 },
   "include": [
     "**/*.ts"
-,       "Controller/ClienteController.ts", "Controller/PlantillaCotizacion/PlantillaController.js"  ],
+,       "Controller/ClienteController.ts", "Controller/PlantillaCotizacion/PlantillaController.js", "Controller/pdfHelper.js"  ],
   "exclude": [
     "node_modules",
     "dist"

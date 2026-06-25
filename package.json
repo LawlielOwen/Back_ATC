@@ -4,11 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "test": "echo \"Error: no test specified\" && exit 1",
-  "dev": "ts-node-dev --respawn server.ts",
-  "build": "tsc",
-  "start": "node dist/server.js"
-},
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node-dev --respawn server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -22,11 +22,11 @@
     "express-validator": "^7.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "multer": "^2.1.1",
+    "multer": "^2.2.0",
     "mysql2": "^3.22.3",
     "node-cron": "^4.2.1",
     "pdf-extraction": "^1.0.2",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "^4.2.67",
     "pdfreader": "^3.0.8",
     "puppeteer": "^25.1.0",
     "socket.io": "^4.8.3"

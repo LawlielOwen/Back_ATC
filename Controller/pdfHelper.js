@@ -1,10 +1,8 @@
-// helpers/leerPdfSat.ts
 // Este archivo exclusivamente modificarlo o ni tocarlo.
 // Unicamente se encarga de cargar la libreria que extrae el texto del pdf.
 const pdfjsLib = require('pdfjs-dist/build/pdf.js');
 
-// Ajuste 1: Se agrega ': Buffer' (o ': any') al parámetro
-async function leerPdfSat(bufferArchivo: Buffer) {
+async function leerPdfSat(bufferArchivo) {
     const uint8Array = new Uint8Array(bufferArchivo);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
 
@@ -12,10 +10,10 @@ async function leerPdfSat(bufferArchivo: Buffer) {
 
     for (let numPagina = 1; numPagina <= pdf.numPages; numPagina++) {
         const pagina = await pdf.getPage(numPagina);
-        const contenido = await pagina.getTextContent() as any;
+        const contenido = await pagina.getTextContent();
 
-        let xAnterior: number | null = null;
-        let yAnterior: number | null = null;
+        let xAnterior = null;
+        let yAnterior = null;
         let lineaActual = '';
 
         for (const item of contenido.items) {
@@ -42,5 +40,4 @@ async function leerPdfSat(bufferArchivo: Buffer) {
     return textoCompleto;
 }
 
-// Ajuste 2: Se cambia a sintaxis de exportación de ES Modules
-export { leerPdfSat };
+module.exports = { leerPdfSat };
