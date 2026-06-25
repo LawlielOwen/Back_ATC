@@ -5,7 +5,8 @@ import fs from 'fs';
 import { Request } from 'express';
 
 // 1. Aseguramos que el directorio exista
-const recibosDir = path.join(__dirname, '../uploads/recibos');
+const recibosDir = path.join(process.cwd(), 'uploads/recibos');
+
 if (!fs.existsSync(recibosDir)) {
     fs.mkdirSync(recibosDir, { recursive: true });
 }
