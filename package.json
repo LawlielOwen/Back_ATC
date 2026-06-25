@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn server.ts",
-    "build": "tsc && cp -r src/Template dist/Template",
+    "build": "tsc && cp -r Template dist/Template",
     "start": "node dist/server.js"
   },
   "keywords": [],
