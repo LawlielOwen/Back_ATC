@@ -298,6 +298,7 @@ export class CotizacionService {
             // 6. GENERACIÓN DEL PDF CON PUPPETEER
             // =========================================================
             const browser = await puppeteer.launch({
+                headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox'] // Básico para evitar errores en el servidor
             });
 
