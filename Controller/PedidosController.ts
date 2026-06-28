@@ -50,33 +50,29 @@ export class PedidoController {
     }
 
  // 3. Subir Factura Física
- static async subirFactura(req: Request, res: Response) {
+static async subirFactura(req: Request, res: Response) {
         try {
             const id_pedido = parseInt(req.params.id as string);
 
-            // 1. Validamos que Multer haya procesado el archivo
             if (!req.file) {
                 return res.status(400).json({ error: 'No se ha detectado ningún archivo de factura para subir.' });
             }
 
             if (isNaN(id_pedido)) {
-                // Borramos el archivo recién subido si el ID es inválido
                 fs.unlinkSync(req.file.path); 
                 return res.status(400).json({ error: 'El ID del pedido no es válido.' });
             }
 
-            // 2. Extraemos los datos
             const nombre_factura = req.file.originalname; 
-            const factura_ruta = req.file.path; // Multer ya nos da la ruta exacta
+ 
+            const factura_ruta = `uploads/recibos/${req.file.filename}`; 
 
-            // 3. Guardamos en DB y recuperamos la ruta vieja
             const { mensaje, ruta_anterior } = await PedidoService.subirFactura(id_pedido, nombre_factura, factura_ruta);
 
-            // 4. SI EXISTE UNA FACTURA ANTERIOR, LA BORRAMOS DEL SERVIDOR
             if (ruta_anterior && ruta_anterior !== '') {
-                const rutaAbsolutaAnterior = path.resolve(ruta_anterior);
+
+                const rutaAbsolutaAnterior = path.join(process.cwd(), ruta_anterior);
                 
-                // Verificamos si el archivo viejo realmente existe antes de intentar borrarlo
                 if (fs.existsSync(rutaAbsolutaAnterior)) {
                     fs.unlinkSync(rutaAbsolutaAnterior); // Esto lo elimina físicamente
                 }
@@ -85,25 +81,26 @@ export class PedidoController {
             return res.status(200).json({ mensaje, ruta: factura_ruta });
 
         } catch (error: any) {
-    console.error('Error en subirFactura:', error);
+            console.error('Error en subirFactura:', error);
 
-    if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-    }
+            // Si hay error, borramos el que se acaba de subir (SÍ lleva req.file.path)
+            if (req.file && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
 
-    if (error.message && error.message.includes('FORMATO_INVALIDO')) {
-        return res.status(400).json({ error: 'Solo se permite subir archivos PDF.' });
-    }
-    if (error.message === 'File too large') {
-         return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
-    }
+            if (error.message && error.message.includes('FORMATO_INVALIDO')) {
+                return res.status(400).json({ error: 'Solo se permite subir archivos PDF.' });
+            }
+            if (error.message === 'File too large') {
+                 return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
+            }
 
-    if (error.message && error.message.startsWith('Error:')) {
-        return res.status(400).json({ error: error.message.replace('Error: ', '') });
-    }
+            if (error.message && error.message.startsWith('Error:')) {
+                return res.status(400).json({ error: error.message.replace('Error: ', '') });
+            }
 
-    return res.status(500).json({ error: 'Error interno del servidor al procesar la factura.' });
-}
+            return res.status(500).json({ error: 'Error interno del servidor al procesar la factura.' });
+        }
     }
 
     // 4. Cancelar Pedido

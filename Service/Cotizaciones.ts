@@ -222,7 +222,7 @@ export class CotizacionService {
 
             // 2. Obtener las partidas (productos)
             const [detalles]: any = await connection.query(`
-                SELECT d.*, p.Codigo_numeral, p.Nombre as nombre_producto
+                SELECT d.*, p.Codigo_numeral, p.Descripcion as nombre_producto
                 FROM detalles_cotizacion d
                 LEFT JOIN productos p ON d.id_producto = p.id
                 WHERE d.id_cotizacion = ?
