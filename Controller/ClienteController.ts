@@ -34,12 +34,12 @@ export class ClienteController {
         }
     }
 
-   static async agregarCliente(req: any, res: Response) {
+static async agregarCliente(req: any, res: Response) {
         try {
             const cliente = { ...req.body };
             if (req.file) {
                 cliente.nombre_constancia = req.file.originalname;
-                cliente.ruta_constancia = req.file.path;
+                cliente.ruta_constancia = `uploads/CSF/${req.file.filename}`;
             } else {
                 cliente.nombre_constancia = '';
                 cliente.ruta_constancia = '';
@@ -50,6 +50,7 @@ export class ClienteController {
 
         } catch (error: any) {
             console.error('Error al agregar cliente:', error);
+            
             if (req.file && req.file.path && fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }

@@ -3,3 +3,4 @@ node_modules/
 pdfHelper.js
 .gitignore
 pdfHelper.ts
+.cache/
