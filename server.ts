@@ -59,6 +59,7 @@ app.use('/api', PedidosRouter);
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 LimpiezaJob.iniciarMantenimiento();
+NotificacionesJob.iniciarTareasProgramadas();
 io.on('connection', (socket) => {
     console.log('cliente conectado a notificaciones');
 
