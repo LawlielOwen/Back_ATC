@@ -30,10 +30,10 @@ const app: Application = express();
 const server = http.createServer(app);
 import path from 'path';
 app.use(helmet());
-app.use(cors({origin: '*'}));
+app.use(cors({origin: 'http://192.168.1.71:8080'}));
 export const io = new Server(server, {
     cors: {
-        origin: '*', 
+       origin: 'http://192.168.1.71:8080', 
         methods: ['GET', 'POST', 'PUT', 'DELETE']
     }
 })
