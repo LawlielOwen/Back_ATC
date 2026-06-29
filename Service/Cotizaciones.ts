@@ -299,7 +299,8 @@ export class CotizacionService {
             // =========================================================
             const browser = await puppeteer.launch({
                 headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'] // Básico para evitar errores en el servidor
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
             });
 
             const page = await browser.newPage();
