@@ -30,10 +30,10 @@ const app: Application = express();
 const server = http.createServer(app);
 import path from 'path';
 app.use(helmet());
-app.use(cors({origin: 'http://192.168.1.71:8080'}));
+app.use(cors({origin: 'http://gestion-atc.local'}));
 export const io = new Server(server, {
     cors: {
-       origin: 'http://192.168.1.71:8080', 
+       origin: 'http://gestion-atc.local', 
         methods: ['GET', 'POST', 'PUT', 'DELETE']
     }
 })

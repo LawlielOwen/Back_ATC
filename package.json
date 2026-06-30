@@ -6,7 +6,7 @@
 "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn server.ts",
-    "build": "tsc && cp -r Template dist/Template && cp -r assets dist/assets",
+    "build": "tsc && copyfiles -u 0 assets/**/* Template/**/* dist/",
     "postinstall": "npx puppeteer browsers install chrome",
     "start": "node dist/server.js"
   },
