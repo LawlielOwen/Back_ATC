@@ -1,22 +1,27 @@
-import fs from 'fs';
 import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
-
+import fs from 'fs'; // Asegúrate de importar fs
+import path from 'path'; 
 const { leerPdfSat } = require('./pdfHelper.js');
 // Importación limpia, ahora sí permitida por el tsconfig
 import pdfParse = require('pdf-parse');
 
 export class ClienteController {
     static async getClientes(req: Request, res: Response) {
-        try {
-            const pagina = parseInt(req.query.pagina as string) || 1;
-            const limite = parseInt(req.query.limite as string) || 9;
-            const result = await ClienteService.obtenerClientes(pagina, limite);
-            res.status(200).json(result);
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
-        }
+       try {
+        const pagina = parseInt(req.query.pagina as string) || 1;
+        const limite = parseInt(req.query.limite as string) || 6;
+
+        const usuario = (req as any).usuario;
+        const idAsesorFiltro = (usuario && usuario.Rol === 'Asesor') ? usuario.id : 0;
+
+        const resultado = await ClienteService.obtenerClientes(pagina, limite, idAsesorFiltro);
+        
+        res.status(200).json(resultado);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al obtener clientes' });
+    }
     }
 
     static async getClientePorId(req: Request, res: Response) {
@@ -269,6 +274,63 @@ static async agregarCliente(req: any, res: Response) {
         } catch (error: any) {
             console.error(error);
             res.status(500).json({ error: 'Error interno del servidor' });
+        }
+    }
+    static async subirCSF(req: any, res: Response) {
+        try {
+            const id_cliente = parseInt(req.params.id as string);
+
+            // 1. Validar que Multer haya subido el archivo
+            if (!req.file) {
+                return res.status(400).json({ error: 'No se ha detectado ningún archivo CSF para subir.' });
+            }
+
+            if (isNaN(id_cliente)) {
+                // Borramos físicamente el archivo recién subido usando path completo
+                fs.unlinkSync(req.file.path); 
+                return res.status(400).json({ error: 'El ID del cliente no es válido.' });
+            }
+
+            // 2. Extraer y formatear rutas
+            const nombre_constancia = req.file.originalname; 
+            // Ruta web limpia para la BD
+            const ruta_constancia = `uploads/CSF/${req.file.filename}`; 
+
+            // 3. Ejecutar actualización en BD
+            const { mensaje, ruta_anterior } = await ClienteService.subirCSF(id_cliente, nombre_constancia, ruta_constancia);
+
+            // 4. LIMPIEZA FÍSICA DEL ARCHIVO ANTERIOR
+            if (ruta_anterior && ruta_anterior !== '') {
+                // Reconstruimos la ruta absoluta del servidor uniendo la raíz con la ruta de la BD
+                const rutaAbsolutaAnterior = path.join(process.cwd(), ruta_anterior);
+                
+                if (fs.existsSync(rutaAbsolutaAnterior)) {
+                    fs.unlinkSync(rutaAbsolutaAnterior); // Adiós archivo viejo
+                }
+            }
+
+            return res.status(200).json({ mensaje, ruta: ruta_constancia });
+
+        } catch (error: any) {
+            console.error('Error en subirCSF:', error);
+
+            // Rollback físico: Si la BD falló, borramos el PDF nuevo que Multer ya había guardado
+            if (req.file && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+
+            if (error.message && error.message.includes('FORMATO_INVALIDO')) {
+                return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
+            }
+            if (error.message === 'File too large') {
+                 return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
+            }
+
+            if (error.message && error.message.startsWith('Error:')) {
+                return res.status(400).json({ error: error.message.replace('Error: ', '') });
+            }
+
+            return res.status(500).json({ error: 'Error interno del servidor al procesar la CSF.' });
         }
     }
 }

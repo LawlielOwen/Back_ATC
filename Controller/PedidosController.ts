@@ -5,33 +5,36 @@ import path from 'path';
 export class PedidoController {
 
     // 1. Buscar, Filtrar y Paginar
- static async buscarYFiltrar(req: Request, res: Response) {
-        try {
-            const busqueda = (req.query.busqueda as string) || '';
-            const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;
-            
-            // Extraemos las dos fechas
-            const fechaInicio = (req.query.fechaInicio as string) || null;
-            const fechaFin = (req.query.fechaFin as string) || null;
-            
-            const pagina = parseInt(req.query.pagina as string) || 1;
-            const limite = parseInt(req.query.limite as string) || 10;
+static async buscarYFiltrar(req: Request, res: Response) {
+    try {
+        const busqueda = (req.query.busqueda as string) || '';
+        const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;
+        
+        const fechaInicio = (req.query.fechaInicio as string) || null;
+        const fechaFin = (req.query.fechaFin as string) || null;
+        
+        // NUEVO: si no viene, se manda null y el SP no filtra
+        const idAsesor = req.query.id_asesor ? parseInt(req.query.id_asesor as string) : null;
+        
+        const pagina = parseInt(req.query.pagina as string) || 1;
+        const limite = parseInt(req.query.limite as string) || 10;
 
-            const result = await PedidoService.buscarYFiltrar(
-                busqueda, 
-                estatus, 
-                fechaInicio, 
-                fechaFin, 
-                pagina, 
-                limite
-            );
+        const result = await PedidoService.buscarYFiltrar(
+            busqueda, 
+            estatus, 
+            fechaInicio, 
+            fechaFin, 
+            idAsesor,          
+            pagina, 
+            limite
+        );
 
-            return res.status(200).json(result);
-        } catch (error: any) {
-            console.error('Error en buscarYFiltrar pedidos:', error);
-            return res.status(500).json({ error: 'Error interno del servidor al obtener los pedidos.' });
-        }
+        return res.status(200).json(result);
+    } catch (error: any) {
+        console.error('Error en buscarYFiltrar pedidos:', error);
+        return res.status(500).json({ error: 'Error interno del servidor al obtener los pedidos.' });
     }
+}
 
     // 2. Obtener Detalles del Pedido
     static async obtenerDetalles(req: Request, res: Response) {

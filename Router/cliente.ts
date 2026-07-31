@@ -3,6 +3,8 @@ import multer from 'multer';
 import { ClienteController } from '../Controller/ClienteController';
 import fs from 'fs';
 import path from 'path';
+import { uploadRecibo } from '../middleware/multerCSF'; 
+
 const router = Router();
 
 // Ajusta los '../' según tu estructura
@@ -47,4 +49,6 @@ router.post('/clientes', uploadDisk.single('archivo'), ClienteController.agregar
 router.put('/clientes/:id', ClienteController.actualizarCliente);
 router.delete('/clientes/:id', ClienteController.eliminarCliente);
 router.put('/clientes/:id/activar', ClienteController.activarCliente);
+router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), ClienteController.subirCSF);
+
 export default router;

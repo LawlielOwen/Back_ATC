@@ -3,38 +3,38 @@ import { Pedido, DetallePedido, PedidoResponse } from '../Model/pedidos';
 
 export class PedidoService {
 
-    // 1. Buscar, Filtrar y Paginar Pedidos
-  static async buscarYFiltrar(
-        busqueda: string, 
-        estatus: number = -1, 
-        fechaInicio: string | null, 
-        fechaFin: string | null, 
-        pagina: number = 1, 
-        limite: number = 10
-    ): Promise<PedidoResponse> {
-        
-        const offset = (pagina - 1) * limite;
+static async buscarYFiltrar(
+    busqueda: string, 
+    estatus: number = -1, 
+    fechaInicio: string | null, 
+    fechaFin: string | null, 
+    idAsesor: number | null,     // NUEVO
+    pagina: number = 1, 
+    limite: number = 10
+): Promise<PedidoResponse> {
+    
+    const offset = (pagina - 1) * limite;
 
-        // Ahora son 6 parámetros en lugar de 5
-        const [rows]: any = await pool.query('CALL sp_buscar_filtrar_pedidos(?, ?, ?, ?, ?, ?)', [
-            busqueda,
-            estatus,
-            fechaInicio,
-            fechaFin,
-            limite,
-            offset
-        ]);
+    const [rows]: any = await pool.query('CALL sp_buscar_filtrar_pedidos(?, ?, ?, ?, ?, ?, ?)', [
+        busqueda,
+        estatus,
+        fechaInicio,
+        fechaFin,
+        idAsesor,                
+        limite,
+        offset
+    ]);
 
-        const pedidos: Pedido[] = rows[0];
-        const total: number = rows[1] ? rows[1][0].total : 0;
+    const pedidos: Pedido[] = rows[0];
+    const total: number = rows[1] ? rows[1][0].total : 0;
 
-        return {
-            pedidos: pedidos,
-            total: total,
-            paginas: Math.ceil(total / limite),
-            paginaActual: pagina
-        };
-    }
+    return {
+        pedidos: pedidos,
+        total: total,
+        paginas: Math.ceil(total / limite),
+        paginaActual: pagina
+    };
+}
 
     // 2. Obtener Detalles de un Pedido (Productos)
     static async obtenerDetallesPorId(id_pedido: number): Promise<DetallePedido[]> {
@@ -50,14 +50,12 @@ export class PedidoService {
    static async subirFactura(id_pedido: number, nombre_factura: string, factura_ruta: string) {
         const connection = await pool.getConnection();
         try {
-            // Llamamos al SP pasando los 3 datos de entrada y declarando las 2 variables de salida
             await connection.query('CALL sp_subir_factura_pedido(?, ?, ?, @p_mensaje, @p_ruta_anterior)', [
                 id_pedido, 
                 nombre_factura, 
                 factura_ruta
             ]);
 
-            // Recuperamos los valores de las variables de salida
             const [results]: any = await connection.query('SELECT @p_mensaje AS mensaje, @p_ruta_anterior AS ruta_anterior');
             
             const mensaje = results[0].mensaje;

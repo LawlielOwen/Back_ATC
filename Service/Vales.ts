@@ -16,13 +16,12 @@ export class ValeService {
         }
 
     }
-    static async soliciarVale(id_asesor: number, id_cliente: number, orden_compra: string, num_factura: string, productos: any[]) {
+static async solicitarVale(id_asesor: number, id_cliente: number, id_pedido: number, productos: any[]) {
         const productosString = JSON.stringify(productos);
-        const [rows]: any = await pool.query('CALL sp_crear_solicitud_vale(?, ?, ?, ?, ?)', [
+                const [rows]: any = await pool.query('CALL sp_crear_solicitud_vale(?, ?, ?, ?)', [
             id_asesor,
             id_cliente,
-            orden_compra,
-            num_factura,
+            id_pedido,
             productosString
         ]);
         return rows;
@@ -71,13 +70,13 @@ export class ValeService {
         const [rows]: any = await pool.query('select * from verVales where id_vale = ?', [id]);
         return rows[0];
     }
-static async consultarProducto(codigo: string, id_proveedor: number | null = null) {
-    const codigoLimpio = codigo.trim(); 
-    const [rows]: any = await pool.query('call sp_buscar_producto_para_vale(?, ?)', [codigoLimpio, id_proveedor]);
-    return rows[0];
-}
+
     static async obtenerDetallesVale(id: number) {
         const [rows]: any = await pool.query('CALL sp_obtener_productos_vale(?)', [id]);
         return rows[0];
     }
+    static async pedidosDisponiblesVale(id_asesor: number) {
+    const [rows]: any = await pool.query('CALL sp_pedidos_disponibles_para_vale(?)', [id_asesor]);
+    return rows[0]; 
+}
 }

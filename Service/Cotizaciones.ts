@@ -23,7 +23,7 @@ export class CotizacionService {
             paginaActual: pagina
         };
     }
-    static async guardarCotizacion(c: any): Promise<number> {
+static async guardarCotizacion(c: any): Promise<number> {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -36,7 +36,7 @@ export class CotizacionService {
                 c.ciudad_destino || null,
                 c.moneda || 'MONEDA NACIONAL',
                 c.tipo_cambio,
-                c.vigencia_dias || 15, // Si no lo mandan, por defecto 15 días
+                c.vigencia_dias || 15, 
                 c.subtotal,
                 c.iva,
                 c.total
@@ -47,17 +47,42 @@ export class CotizacionService {
 
             if (c.detalles && c.detalles.length > 0) {
                 for (const item of c.detalles) {
-                    // Actualizamos el INSERT para incluir la descripción extra y el tiempo de entrega
+                    
+                    // =================================================================
+                    // 1. Consultar la marca y el origen fijo del producto en la BD
+                    // =================================================================
+                    const [prodRows]: any = await connection.query(
+                        `SELECT m.Nombre AS marca, p.origen 
+                         FROM productos p 
+                         LEFT JOIN marca_proveedor m ON p.id_marca = m.id 
+                         WHERE p.id = ?`, 
+                        [item.id_producto]
+                    );
+                    
+                    const productoInfo = prodRows[0] || {};
+                    let origenFinal = item.origen; // Por defecto, asumimos que el frontend manda el origen manual
+                    
+                    // =================================================================
+                    // 2. Lógica de Negocio: SMC tiene origen fijo, sobreescribimos lo del frontend
+                    // =================================================================
+                    if (productoInfo.marca === 'SMC') {
+                        // Forzamos el origen que ya está registrado en el inventario
+                        origenFinal = productoInfo.origen; 
+                    }
+
+                    // =================================================================
+                    // 3. Insertar el detalle con el origen ya definido
+                    // =================================================================
                     await connection.query(
                         `INSERT INTO detalles_cotizacion 
-                        (id_producto, id_cotizacion, cantidad_producto, extra_descripcion, tiempo_entrega, precio_unitario_cotizado) 
+                        (id_producto, id_cotizacion, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado) 
                         VALUES (?, ?, ?, ?, ?, ?)`,
                         [
                             item.id_producto,
                             idCotizacion,
                             item.cantidad_producto,
-                            item.extra_descripcion || null,
-                            item.tiempo_entrega || 'INMEDIATO', // Valor por defecto si no lo envían
+                            origenFinal || null, // Se guardará el fijo de SMC o el manual del frontend
+                            item.tiempo_entrega || 'INMEDIATO', 
                             item.precio_unitario_cotizado
                         ]
                     );
@@ -74,31 +99,62 @@ export class CotizacionService {
             connection.release();
         }
     }
-    static async modificarCotizacion(id: number, c: CotizacionCompleta) {
+  static async modificarCotizacion(id: number, c: any) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
-            await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?)', [
+            
+            // 1. Actualizamos la cabecera enviando los 11 parámetros requeridos por el SP
+            await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
                 id,
-                c.extra_descripcion || null,
                 c.id_cliente || null,
                 c.nombre_prospecto || null,
+                c.contacto || null,
+                c.ciudad_destino || null,
+                c.moneda || 'MONEDA NACIONAL',
                 c.tipo_cambio,
+                c.vigencia_dias || 15,
                 c.subtotal,
                 c.iva,
                 c.total
             ]);
+            
             await connection.query('DELETE FROM detalles_cotizacion WHERE id_cotizacion = ?', [id]);
+            
             if (c.detalles && c.detalles.length > 0) {
                 for (const item of c.detalles) {
+                    
+                    const [prodRows]: any = await connection.query(
+                        `SELECT m.Nombre AS marca, p.origen 
+                         FROM productos p 
+                         LEFT JOIN marca_proveedor m ON p.id_marca = m.id 
+                         WHERE p.id = ?`, 
+                        [item.id_producto]
+                    );
+                    
+                    const productoInfo = prodRows[0] || {};
+                    let origenFinal = item.origen; 
+                    
+                    if (productoInfo.marca === 'SMC') {
+                        origenFinal = productoInfo.origen; 
+                    }
+
                     await connection.query(
                         `INSERT INTO detalles_cotizacion 
-                        (id_producto, id_cotizacion, cantidad_producto, precio_unitario_cotizado) 
-                        VALUES (?, ?, ?, ?)`,
-                        [item.id_producto, id, item.cantidad_producto, item.precio_unitario_cotizado]
+                        (id_producto, id_cotizacion, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado) 
+                        VALUES (?, ?, ?, ?, ?, ?)`,
+                        [
+                            item.id_producto, 
+                            id, 
+                            item.cantidad_producto, 
+                            origenFinal || null, 
+                            item.tiempo_entrega || 'INMEDIATO',
+                            item.precio_unitario_cotizado
+                        ]
                     );
                 }
             }
+            
             await connection.commit();
             return { mensaje: 'Cotización actualizada correctamente' };
 
@@ -165,12 +221,12 @@ export class CotizacionService {
             paginaActual: pagina
         };
     }
-    static async convertirAPedido(idCotizacion: number) { // <-- Solo recibe el ID
+    static async convertirAPedido(idCotizacion: number, orden_compra: string) {
         const connection = await pool.getConnection();
         try {
             await connection.query(
-                'CALL sp_convertir_cotizacion_pedido(?, @nuevo_pedido, @mensaje_res)', // <-- Quitamos los dos '?'
-                [idCotizacion]
+                'CALL sp_convertir_cotizacion_pedido(?, ? , @nuevo_pedido, @mensaje_res)', // <-- Quitamos los dos '?'
+                [idCotizacion, orden_compra]
             );
 
             const [rows]: any = await connection.query('SELECT @nuevo_pedido AS id_pedido, @mensaje_res AS mensaje');
@@ -222,7 +278,7 @@ export class CotizacionService {
 
             // 2. Obtener las partidas (productos)
             const [detalles]: any = await connection.query(`
-                SELECT d.*, p.Codigo_numeral, p.Descripcion as nombre_producto
+                SELECT d.*, p.Codigo_numeral, p.Descripcion as nombre_producto,p.ExtraDescripcion
                 FROM detalles_cotizacion d
                 LEFT JOIN productos p ON d.id_producto = p.id
                 WHERE d.id_cotizacion = ?
@@ -235,27 +291,49 @@ export class CotizacionService {
             const esUSD = cot.moneda === 'USD';
             const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
 
-            detalles.forEach((item: any, index: number) => {
-                const precioUnitarioConvertido = Number(item.precio_unitario_cotizado) / factorConversion;
-                const subtotalLineaConvertido = (item.cantidad_producto * Number(item.precio_unitario_cotizado)) / factorConversion;
+           const escapeHtml = (str: any) => {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+};
 
-                filasHtml += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.cantidad_producto}</td>
-                    <td>${item.Codigo_numeral || 'S/C'}</td>
-                    <td class="text-left">${item.nombre_producto}</td>
-                    <td class="text-left">${item.extra_descripcion || ''}</td>
-                    <td>${item.tiempo_entrega || 'INMEDIATO'}</td>
-                    <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-                    <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
-                </tr>`;
-            });
+detalles.forEach((item: any, index: number) => {
+    const precioUnitarioConvertido = Number(item.precio_unitario_cotizado) / factorConversion;
+    const subtotalLineaConvertido = (item.cantidad_producto * Number(item.precio_unitario_cotizado)) / factorConversion;
 
-            // Rellenar con filas vacías (para mantener el formato Excel hasta abajo)
-            for (let i = detalles.length; i < 15; i++) {
-                filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-            }
+    const origen = item.origen ? String(item.origen).trim() : '';
+
+
+    const esOrigenRojo = /reab|obsoleto/i.test(origen);
+
+    const celdaExtra = origen
+        ? `<div class="extra-desc-flex has-origen">
+                <span class="extra-desc-text">${escapeHtml(item.ExtraDescripcion)}</span>
+                <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
+           </div>`
+        : `<div class="extra-desc-flex">
+                <span class="extra-desc-text">${escapeHtml(item.ExtraDescripcion)}</span>
+           </div>`;
+
+    filasHtml += `
+    <tr>
+        <td>${index + 1}</td>
+        <td>${item.cantidad_producto}</td>
+        <td>${item.Codigo_numeral || 'S/C'}</td>
+        <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
+        <td class="text-left">${celdaExtra}</td>
+        <td>${item.tiempo_entrega || 'INMEDIATO'}</td>
+        <td>$${precioUnitarioConvertido.toFixed(2)}</td>
+        <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+    </tr>`;
+});
+
+           const FILAS_MINIMAS = 6;
+for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
+    filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+}
 
 
             const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
@@ -294,35 +372,59 @@ export class CotizacionService {
                 .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
                 .replace(/{{texto_monto_letras}}/g, 'AQUÍ VA TU TEXTO EN LETRAS');
 
-            // =========================================================
-            // 6. GENERACIÓN DEL PDF CON PUPPETEER
-            // =========================================================
-            const browser = await puppeteer.launch({
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
-            });
+          const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
+});
 
-            const page = await browser.newPage();
+const page = await browser.newPage();
 
-            // Cargamos el HTML en la página invisible
+const DPI = 96;
+const anchoHojaPulgadas = 11;
+const altoHojaPulgadas = 8.5;
+const margenPulgadas = 10 / 25.4;
+
+const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
+const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
+
+await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
 await page.setContent(htmlListo, { waitUntil: 'load' });
-            // "Imprimimos" a PDF respetando fondos (printBackground: true)
-            const pdfBuffer = await page.pdf({
-                format: 'Letter',
-                printBackground: true,
-                landscape: true,
-                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
-            });
 
-            await browser.close();
+const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
 
-            // Devolvemos el binario del PDF al controlador
-            return pdfBuffer;
+let escala = 1;
+if (alturaContenidoPx > altoUtilPx) {
+    escala = altoUtilPx / alturaContenidoPx;
+    escala = Math.max(escala, 0.65); 
+}
+
+const pdfBuffer = await page.pdf({
+    format: 'Letter',
+    printBackground: true,
+    landscape: true,
+    scale: escala,   
+    margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
+});
+
+await browser.close();
+return pdfBuffer;
 
         } finally {
             // Siempre liberamos la conexión a la base de datos
             connection.release();
         }
     }
+    static async vincularCliente(id_cotizacion: number, id_cliente: number) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.query(
+            'UPDATE cotizaciones SET id_cliente = ? WHERE id = ?', 
+            [id_cliente, id_cotizacion]
+        );
+        return { mensaje: 'Cliente vinculado correctamente a la cotización.' };
+    } finally {
+        connection.release();
+    }
+}
 }

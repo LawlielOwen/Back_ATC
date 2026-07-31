@@ -1,18 +1,16 @@
 import pool from '../Config/db';
 
 export class ProveedorService {
-    static async registrarPedido(id_asesor: number, id_proveedor: number, destino: string,
-        fecha: string, productos: any[]) {
-        const productosString = JSON.stringify(productos);
-        const [rows]: any = await pool.query('CALL sp_crear_pedido_proveedor(?, ?, ?, ?, ?)', [
-            id_asesor,
-            id_proveedor,
-            destino,
-            fecha,
-            productosString
-        ]);
-        return rows;
-    }
+    static async registrarPedido(id_asesor: number, id_proveedor: number, fecha: string, productos: any[]) {
+    const productosString = JSON.stringify(productos);
+    const [rows]: any = await pool.query('CALL sp_crear_pedido_proveedor(?, ?, ?, ?)', [
+        id_asesor,
+        id_proveedor,
+        fecha,
+        productosString
+    ]);
+    return rows;
+}
     static async recibirPedido(id_pedido: number, id_asesor: number) {
         const [rows]: any = await pool.query('CALL sp_recibir_pedido_completo(?, ?)', [
             id_pedido,

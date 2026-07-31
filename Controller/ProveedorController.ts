@@ -4,20 +4,26 @@ import { ProveedorService } from "../Service/Proveedor";
 export class ProveedorController {
 
     static async registrarPedido(req: Request, res: Response) {
-        try {
-            const { id_asesor, id_proveedor, destino, fecha, productos } = req.body;
+    try {
+        const { id_asesor, id_proveedor, fecha, productos } = req.body;
 
-            if (!id_asesor || !id_proveedor || !destino || !fecha || !productos || productos.length === 0) {
-                return res.status(400).json({ error: 'Todos los campos son obligatorios y debe incluir al menos un producto' });
-            }
+        const productosValidos = Array.isArray(productos) && productos.every((p: any) =>
+            p.id_producto && p.cantidad > 0 && ['Almacen', 'Pedido'].includes(p.destino)
+        );
 
-            const result = await ProveedorService.registrarPedido(id_asesor, id_proveedor, destino, fecha, productos);
-            res.status(200).json(result[0])
-        } catch (error: any) {
-            console.error('Error en registrarPedido:', error);
-            res.status(500).json({ error: 'Error interno del servidor al registrar el pedido' });
+        if (!id_asesor || !id_proveedor || !fecha || !productos || productos.length === 0 || !productosValidos) {
+            return res.status(400).json({ 
+                error: 'Todos los campos son obligatorios y cada producto debe incluir id_producto, cantidad y destino (Almacen o Pedido)' 
+            });
         }
+
+        const result = await ProveedorService.registrarPedido(id_asesor, id_proveedor, fecha, productos);
+        res.status(200).json(result[0])
+    } catch (error: any) {
+        console.error('Error en registrarPedido:', error);
+        res.status(500).json({ error: 'Error interno del servidor al registrar el pedido' });
     }
+}
 
     static async recibirPedido(req: Request, res: Response) {
         try {

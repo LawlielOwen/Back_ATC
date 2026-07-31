@@ -58,13 +58,16 @@ export class CotizacionController {
    static async convertirCotizacion(req: Request, res: Response) {
         try {
             const idCotizacion = parseInt(req.params.id as string);
-            
+            const { orden_compra } = req.body;
+
             if (!idCotizacion || isNaN(idCotizacion)) {
                 return res.status(400).json({ error: 'ID de cotización inválido o no proporcionado' });
             }
+            if (!orden_compra || typeof orden_compra !== 'string') {
+                return res.status(400).json({ error: 'El número de orden de compra es obligatorio y debe ser una cadena de texto' });
+            }
 
-            // Ya no requerimos id_asesor ni fecha_limite del body
-            const resultado = await CotizacionService.convertirAPedido(idCotizacion);
+            const resultado = await CotizacionService.convertirAPedido(idCotizacion, orden_compra);
             
             res.status(200).json(resultado);
 
@@ -177,4 +180,25 @@ static async buscaryfiltrar(req: Request, res: Response) {
         res.status(500).json({ error: 'Error al generar el documento PDF' });
     }
 }
+static async vincularCliente(req: any, res: any) {
+        try {
+            const id_cotizacion = parseInt(req.params.id);
+            const { id_cliente } = req.body; 
+
+            if (isNaN(id_cotizacion)) {
+                return res.status(400).json({ error: 'El ID de la cotización no es válido.' });
+            }
+
+            if (!id_cliente || isNaN(parseInt(id_cliente))) {
+                return res.status(400).json({ error: 'Se requiere un ID de cliente válido para vincular.' });
+            }
+
+            const result = await CotizacionService.vincularCliente(id_cotizacion, parseInt(id_cliente));
+            return res.status(200).json(result);
+
+        } catch (error: any) {
+            console.error('Error al vincular cliente a la cotización:', error);
+            return res.status(500).json({ error: 'Error interno del servidor al vincular el cliente.' });
+        }
+    }
 }

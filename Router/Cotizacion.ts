@@ -8,6 +8,7 @@ router.get('/cotizaciones/productos', CotizacionController.consultarProductoPara
 router.get('/cotizaciones', CotizacionController.buscaryfiltrar);
 router.post('/cotizaciones', CotizacionController.crearCotizacion);
 router.post('/cotizaciones/:id/convertir', CotizacionController.convertirCotizacion);
+router.put('/cotizaciones/:id/vincular-cliente', CotizacionController.vincularCliente);
 router.get('/cotizaciones/:id', CotizacionController.obtenerCotId);
 router.put('/cotizaciones/:id', CotizacionController.modificarCotizacion);
 router.delete('/cotizaciones/:id', CotizacionController.cancelarCot);

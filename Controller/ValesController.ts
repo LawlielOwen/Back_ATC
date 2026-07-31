@@ -33,30 +33,34 @@ export class ValeController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-static async solicitarVale(req: Request, res: Response) {
+static async solicitarVale(req: any, res: any) {
         try {
-            const { id_asesor, id_cliente, orden_compra, num_factura, productos } = req.body;
-            if (!id_asesor || !id_cliente || !orden_compra || !productos) {
-                return res.status(400).json({ error: 'Los campos son obligatorios' });
+            // Recibimos los nuevos campos
+            const { id_asesor, id_cliente, id_pedido, productos } = req.body;
+            
+            // Validamos que vengan (asumimos que id_pedido es obligatorio ahora)
+            if (!id_asesor || !id_cliente || !id_pedido || !productos) {
+                return res.status(400).json({ error: 'Los campos de asesor, cliente, pedido y productos son obligatorios' });
             }
             
             // 1. Guardar en Base de Datos
-            const result = await ValeService.soliciarVale(id_asesor, id_cliente, orden_compra, num_factura, productos);
+            const result = await ValeService.solicitarVale(id_asesor, id_cliente, id_pedido, productos);
             
             // 2. WEBSOCKET: Avisar a los de Almacén y Administradores
             io.to('rol_Almacen').to('rol_Administrador').emit('nueva_notificacion', {
                 titulo: 'Nueva Solicitud',
                 mensaje: 'Se ha generado una nueva solicitud de vale de salida.'
             });
-           io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+            io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+            
             // 3. Responder al Asesor
-            res.status(200).json(result);
+            return res.status(200).json(result);
+            
         } catch (error: any) {
             console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+            return res.status(500).json({ error: 'Error interno del servidor al crear el vale' });
         }
     }
-
     static async aceptaVale(req: Request, res: Response) {
         try {
             const { id, comentarios, id_asesor } = req.body; // <-- Pide el id_asesor desde Angular
@@ -128,24 +132,19 @@ static async solicitarVale(req: Request, res: Response) {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-    static async consultarProducto(req: Request, res: Response) {
-        try {
-            const codigo = req.query.codigo as string;
-            if (!codigo) {
-                return res.status(400).json({ error: 'El código del producto es obligatorio' });
-            }
-            const id_proveedor = req.query.proveedor ? parseInt(req.query.proveedor as string) : null;
-            const result = await ValeService.consultarProducto(codigo, id_proveedor);
-            if (result) {
-                res.status(200).json(result);
-            } else {
-                res.status(404).json({ error: 'Producto no encontrado' });
-            }
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+static async pedidosDisponiblesVale(req: any, res: any) {
+    try {
+        const id_asesor = parseInt(req.query.id_asesor);
+        if (isNaN(id_asesor)) {
+            return res.status(400).json({ error: 'Se requiere un id_asesor válido.' });
         }
+        const pedidos = await ValeService.pedidosDisponiblesVale(id_asesor);
+        return res.status(200).json(pedidos);
+    } catch (error: any) {
+        console.error('Error al listar pedidos disponibles para vale:', error);
+        return res.status(500).json({ error: 'Error interno del servidor.' });
     }
+}
     static async getValePorId(req: Request, res: Response) {
         try {
             const id = parseInt(req.params.id as string);
