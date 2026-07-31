@@ -12,4 +12,7 @@ export interface Productos{
     Estatus: number
     id_marca: number
     Marca: string
+    ExtraDescripcion: string
+    Apartado: number
+    origen: string
 }

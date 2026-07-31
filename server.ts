@@ -22,32 +22,40 @@ import NotificacionRouter from './Router/Notificacion';
 import ProveedorRouter from './Router/Proveedor';
 import PedidosRouter from './Router/pedidos';
 import MetricasRouter from './Router/Metricas';
+import TicketRouter from './Router/Ticket';
 // Middleware
 import cors from 'cors';
 import { standardLimiter, loginLimiter, searchLimiter } from './middleware/rate-limit';
+import { verificarToken } from './middleware/Auth.middleware ';
 import helmet from 'helmet';
 const app: Application = express();
 const server = http.createServer(app);
 import path from 'path';
 app.use(helmet());
-app.use(cors({origin: 'http://gestion-atc.local'}));
+app.use(cors({origin: '*'}));
 export const io = new Server(server, {
     cors: {
-       origin: 'http://gestion-atc.local', 
+       origin: '*', 
         methods: ['GET', 'POST', 'PUT', 'DELETE']
     }
 })
 app.use(express.json());
 app.use('/api/login', loginLimiter); 
 app.use('/api/asesores/registro', loginLimiter);
-
 app.use('/api/metricas', searchLimiter);
 app.use('/api', standardLimiter);
-app.use('/api', LoginRouter);
-app.use('/api', MetricasRouter);
+
 app.use('/api', healthRouter);
-app.use('/api', ClienteRouter);
+app.use('/api', LoginRouter);
+
+
 app.use('/api', AsesoresRouter);
+
+
+app.use('/api', verificarToken);
+
+app.use('/api', MetricasRouter);
+app.use('/api', ClienteRouter);
 app.use('/api', ProductosRouter);
 app.use('/api', MarcasRouter);
 app.use('/api', NotificacionRouter);
@@ -56,12 +64,12 @@ app.use('/api', MovimientosRouter);
 app.use('/api', ValesRouter);
 app.use('/api', ProveedorRouter);
 app.use('/api', PedidosRouter);
+app.use('/api', TicketRouter);
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 LimpiezaJob.iniciarMantenimiento();
 NotificacionesJob.iniciarTareasProgramadas();
 io.on('connection', (socket) => {
-    console.log('cliente conectado a notificaciones');
 
 socket.on('unirse_a_sala', (datosUsuario) => {
         
@@ -72,18 +80,17 @@ socket.on('unirse_a_sala', (datosUsuario) => {
         if (datosUsuario && datosUsuario.id && datosUsuario.rol) {
             socket.join(`usuario_${datosUsuario.id}`);
             socket.join(`rol_${datosUsuario.rol}`);
-            console.log(`🟢 Usuario unido a ID: usuario_${datosUsuario.id} y ROL: rol_${datosUsuario.rol}`);
         } else {
-            console.log('🟡 Intento de conexión fallido. Datos inválidos:', datosUsuario);
+            console.log('Intento de conexión fallido. Datos inválidos:', datosUsuario);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log(' Cliente desconectado');
+       
     });
 });
 server.listen(3000, () => {
-    console.log(`🚀 Servidor HTTP y WebSockets corriendo en el puerto 3000, BD en: ${process.env.DB_HOST}`);
+    console.log(` Servidor HTTP y WebSockets corriendo en el puerto 3000, BD en: ${process.env.DB_HOST}`);
 });
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(err.stack);

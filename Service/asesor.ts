@@ -153,7 +153,7 @@ export class AsesorService {
       if (mensaje && mensaje.startsWith('Error:')) {
         throw new Error(mensaje);
       }
-
+    
       return { mensaje };
     } finally {
       connection.release();

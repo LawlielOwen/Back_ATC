@@ -2,7 +2,7 @@ import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 
 dotenv.config();
-/*
+
 const conexion = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT),
@@ -24,8 +24,8 @@ export async function testDbConnection() {
         
 
 }
-export default conexion; */
-
+export default conexion; 
+/*
 const conexion = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT) || 3306,
@@ -50,5 +50,4 @@ conexion.on('connection', async (connection: any) => {
     console.error("Error configurando la zona horaria en la conexión:", err);
   }
 });
-
-export default conexion;
+*/

@@ -1,6 +1,7 @@
 export interface Cliente{
     id: number;
     Nombre: string;
+    
     RFC: string;
     Razon_social: string;
     Regimen_fiscal: string;

@@ -2,12 +2,55 @@ import pool from '../Config/db';
 import { Productos } from '../Model/Productos'
 
 export class ProductoService {
-    static async agregarProducto(p: Productos) {
-        const { Nombre, Descripcion, Precio, Codigo_numeral, Codigo_japon, Modelo, Estanteria, Caja,
-            Stock, id_marca } = p;
+static async agregarProducto(p: Productos) {
+        // 1. Agregamos ExtraDescripcion, Apartado y origen a la desestructuración
+        const { 
+            Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
+            Codigo_japon, Modelo, Estanteria, Caja, Stock, Apartado, origen, id_marca 
+        } = p;
 
-        const [rows]: any = await pool.query('call sp_agregar_producto(?,?,?,?,?,?,?,?,?,?)', [
-            Nombre, Descripcion, Precio, Codigo_numeral, Codigo_japon, Modelo, Estanteria, Caja, Stock, id_marca
+        // 2. Ahora son 13 signos de interrogación (?)
+        const [rows]: any = await pool.query('call sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+            Nombre, 
+            Descripcion, 
+            ExtraDescripcion || null, 
+            Precio, 
+            Codigo_numeral, 
+            Codigo_japon, 
+            Modelo, 
+            Estanteria, 
+            Caja, 
+            Stock || 0, 
+            Apartado || 0, 
+            origen || null, 
+            id_marca 
+        ]);
+        return rows;
+    }
+
+    static async modificarProducto(id: Number, p: Productos) {
+        // 1. Agregamos ExtraDescripcion, Apartado y origen a la desestructuración
+        const { 
+            Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
+            Codigo_japon, Modelo, Estanteria, Caja, Stock, Apartado, origen, id_marca 
+        } = p;
+
+        // 2. Ahora son 14 signos de interrogación (?) porque incluye el ID al principio
+        const [rows]: any = await pool.query('call sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+            id, 
+            Nombre, 
+            Descripcion, 
+            ExtraDescripcion || null, 
+            Precio, 
+            Codigo_numeral, 
+            Codigo_japon, 
+            Modelo, 
+            Estanteria, 
+            Caja, 
+            Stock || 0, 
+            Apartado || 0, 
+            origen || null, 
+            id_marca
         ]);
         return rows;
     }
@@ -29,15 +72,7 @@ export class ProductoService {
         const [rows]: any = await pool.query('select * from verProductos where id = ?', [id]);
         return rows[0];
     }
-    static async modificarProducto(id: Number, p: Productos) {
-        const { Nombre, Descripcion, Precio, Codigo_numeral, Codigo_japon, Modelo, Estanteria, Caja,
-            Stock, id_marca } = p;
-
-        const [rows]: any = await pool.query('call sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?)', [
-            id, Nombre, Descripcion, Precio, Codigo_numeral, Codigo_japon, Modelo, Estanteria, Caja, Stock, id_marca
-        ]);
-        return rows;
-    }
+ 
     static async eliminarProducto(id: number) {
         const [rows]: any = await pool.query('call sp_eliminar_producto(?)', [id]);
         return rows;
