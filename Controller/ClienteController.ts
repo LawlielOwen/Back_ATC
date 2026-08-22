@@ -1,27 +1,27 @@
 import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
 import fs from 'fs'; // Asegúrate de importar fs
-import path from 'path'; 
+import path from 'path';
 const { leerPdfSat } = require('./pdfHelper.js');
 // Importación limpia, ahora sí permitida por el tsconfig
 import pdfParse = require('pdf-parse');
 
 export class ClienteController {
     static async getClientes(req: Request, res: Response) {
-       try {
-        const pagina = parseInt(req.query.pagina as string) || 1;
-        const limite = parseInt(req.query.limite as string) || 6;
+        try {
+            const pagina = parseInt(req.query.pagina as string) || 1;
+            const limite = parseInt(req.query.limite as string) || 6;
 
-        const usuario = (req as any).usuario;
-        const idAsesorFiltro = (usuario && usuario.Rol === 'Asesor') ? usuario.id : 0;
+            const usuario = (req as any).usuario;
+            const idAsesorFiltro = (usuario && usuario.Rol === 'Asesor') ? usuario.id : 0;
 
-        const resultado = await ClienteService.obtenerClientes(pagina, limite, idAsesorFiltro);
-        
-        res.status(200).json(resultado);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Error al obtener clientes' });
-    }
+            const resultado = await ClienteService.obtenerClientes(pagina, limite, idAsesorFiltro);
+
+            res.status(200).json(resultado);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Error al obtener clientes' });
+        }
     }
 
     static async getClientePorId(req: Request, res: Response) {
@@ -39,7 +39,7 @@ export class ClienteController {
         }
     }
 
-static async agregarCliente(req: any, res: Response) {
+    static async agregarCliente(req: any, res: Response) {
         try {
             const cliente = { ...req.body };
             if (req.file) {
@@ -50,23 +50,28 @@ static async agregarCliente(req: any, res: Response) {
                 cliente.ruta_constancia = '';
             }
 
-            const result = await ClienteService.agregarCliente(cliente);
+            // El array de asesores viaja como string dentro del FormData, hay que parsearlo
+            let asesoresAsignados: any[] = [];
+            try {
+                asesoresAsignados = JSON.parse(req.body.asesores_json || '[]');
+            } catch {
+                asesoresAsignados = [];
+            }
+
+            const result = await ClienteService.agregarCliente(cliente, asesoresAsignados);
             return res.status(201).json(result);
 
         } catch (error: any) {
             console.error('Error al agregar cliente:', error);
-            
             if (req.file && req.file.path && fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }
-
             if (error.message && error.message.includes('FORMATO_INVALIDO')) {
                 return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
             }
             if (error.message === 'File too large') {
                 return res.status(400).json({ error: 'La constancia es demasiado grande. El límite es 5MB.' });
             }
-
             return res.status(500).json({ error: 'Error interno del servidor al agregar cliente' });
         }
     }
@@ -76,17 +81,22 @@ static async agregarCliente(req: any, res: Response) {
             const id = parseInt(req.params.id as string);
             const cliente = { ...req.body };
 
-            // Lógica añadida: Si el usuario sube un archivo NUEVO durante la edición
             if (req.file) {
                 cliente.nombre_constancia = req.file.originalname;
                 cliente.ruta_constancia = req.file.path;
             } else {
-                // Si no suben archivo, mantenemos los que vienen en el body (si existían)
                 cliente.nombre_constancia = req.body.nombre_constancia || '';
                 cliente.ruta_constancia = req.body.ruta_constancia || '';
             }
 
-            const result = await ClienteService.actualizarCliente(id, cliente);
+            let asesoresAsignados: any[] = [];
+            try {
+                asesoresAsignados = JSON.parse(req.body.asesores_json || '[]');
+            } catch {
+                asesoresAsignados = [];
+            }
+
+            const result = await ClienteService.actualizarCliente(id, cliente, asesoresAsignados);
             res.status(200).json(result);
         } catch (error: any) {
             console.error(error);
@@ -129,7 +139,6 @@ static async agregarCliente(req: any, res: Response) {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-    //Sanitizacion de los datos extraidos del pdf
     static async procesarCSF(req: any, res: Response) {
         try {
             if (!req.file) {
@@ -179,7 +188,7 @@ static async agregarCliente(req: any, res: Response) {
 
             const mapaRegimenes: Record<string, string> = {
                 'general de ley personas morales': '601',
-                'fines no lucrativos': '603', // Lo acorté para que haga match más fácil
+                'fines no lucrativos': '603',
                 'sueldos y salarios': '605',
                 'arrendamiento': '606',
                 'personas físicas con actividades': '612',
@@ -192,7 +201,6 @@ static async agregarCliente(req: any, res: Response) {
                 const fragmentoRegimen = matchRegimen[0].toLowerCase();
 
                 for (const [clave, codigo] of Object.entries(mapaRegimenes)) {
-                    // Buscamos la clave solo en el fragmentito de texto del régimen
                     if (fragmentoRegimen.includes(clave)) {
                         codigoRegimen = codigo;
                         break;
@@ -238,7 +246,6 @@ static async agregarCliente(req: any, res: Response) {
                 /Nombre\s*de\s*la\s*Entidad\s*Federativa\s*:?\s*(.+?)(?=\s*Entre\s*Calle)/i
             );
 
-            // Armamos la dirección limpia y con Title Case básico para que no todo esté gritando en mayúsculas
             const direccionCompuesta = [
                 matchVialidad ? formatearTexto(matchVialidad[1]) : '',
                 matchNumExt ? `#${formatearTexto(matchNumExt[1])}` : '',
@@ -280,32 +287,24 @@ static async agregarCliente(req: any, res: Response) {
         try {
             const id_cliente = parseInt(req.params.id as string);
 
-            // 1. Validar que Multer haya subido el archivo
             if (!req.file) {
                 return res.status(400).json({ error: 'No se ha detectado ningún archivo CSF para subir.' });
             }
 
             if (isNaN(id_cliente)) {
-                // Borramos físicamente el archivo recién subido usando path completo
-                fs.unlinkSync(req.file.path); 
+                fs.unlinkSync(req.file.path);
                 return res.status(400).json({ error: 'El ID del cliente no es válido.' });
             }
 
-            // 2. Extraer y formatear rutas
-            const nombre_constancia = req.file.originalname; 
-            // Ruta web limpia para la BD
-            const ruta_constancia = `uploads/CSF/${req.file.filename}`; 
-
-            // 3. Ejecutar actualización en BD
+            const nombre_constancia = req.file.originalname;
+            const ruta_constancia = `uploads/CSF/${req.file.filename}`;
             const { mensaje, ruta_anterior } = await ClienteService.subirCSF(id_cliente, nombre_constancia, ruta_constancia);
 
-            // 4. LIMPIEZA FÍSICA DEL ARCHIVO ANTERIOR
             if (ruta_anterior && ruta_anterior !== '') {
-                // Reconstruimos la ruta absoluta del servidor uniendo la raíz con la ruta de la BD
                 const rutaAbsolutaAnterior = path.join(process.cwd(), ruta_anterior);
-                
+
                 if (fs.existsSync(rutaAbsolutaAnterior)) {
-                    fs.unlinkSync(rutaAbsolutaAnterior); // Adiós archivo viejo
+                    fs.unlinkSync(rutaAbsolutaAnterior);
                 }
             }
 
@@ -314,7 +313,6 @@ static async agregarCliente(req: any, res: Response) {
         } catch (error: any) {
             console.error('Error en subirCSF:', error);
 
-            // Rollback físico: Si la BD falló, borramos el PDF nuevo que Multer ya había guardado
             if (req.file && fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }
@@ -323,7 +321,7 @@ static async agregarCliente(req: any, res: Response) {
                 return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
             }
             if (error.message === 'File too large') {
-                 return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
+                return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
             }
 
             if (error.message && error.message.startsWith('Error:')) {
@@ -331,6 +329,40 @@ static async agregarCliente(req: any, res: Response) {
             }
 
             return res.status(500).json({ error: 'Error interno del servidor al procesar la CSF.' });
+        }
+    }
+    static async asignarCredito(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { tiene_credito, limite_credito } = req.body;
+
+            if (tiene_credito === undefined || tiene_credito === null) {
+                return res.status(400).json({ error: 'El campo tiene_credito es obligatorio.' });
+            }
+
+            const limite = limite_credito !== undefined && limite_credito !== null
+                ? Number(limite_credito)
+                : 0;
+
+            if (isNaN(limite)) {
+                return res.status(400).json({ error: 'El límite de crédito debe ser un número válido.' });
+            }
+
+            const mensaje = await ClienteService.asignarCredito(
+                Number(id),
+                Boolean(tiene_credito),
+                limite
+            );
+
+            if (mensaje.toLowerCase().startsWith('error')) {
+                return res.status(400).json({ error: mensaje });
+            }
+
+            return res.status(200).json({ mensaje });
+
+        } catch (error) {
+            console.error('Error al asignar crédito:', error);
+            return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
         }
     }
 }

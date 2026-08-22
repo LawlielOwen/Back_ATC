@@ -12,7 +12,7 @@ CREATE TABLE asesores (
     usuario VARCHAR(100),
     contra VARCHAR(255),
     Estatus TINYINT,
-    Rol ENUM('Almacen', 'Cotizador', 'Administrador','Asesor'),
+    Rol ENUM('Almacen', 'Cotizador', 'Administrador','Asesor','Soporte Tecnico'),
 	Fecha_nacimiento date,
     Fecha_contratacion date,
     Correo varchar(100)
@@ -46,20 +46,18 @@ INSERT INTO `marca_proveedor` VALUES
 -- 2. Tabla Productos (Sin dependencias previas)
 CREATE TABLE productos (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    Nombre VARCHAR(100),
-    Descripcion VARCHAR(250),
-    ExtraDescripcion text,
+    Nombre VARCHAR(100),              -- Aquí va el Modelo (ej. KQ2H06/01AS)
+    Descripcion VARCHAR(250),         -- Aquí va el texto (ej. CONECTOR 6 MM RECTO)
+    ExtraDescripcion TEXT,
     Precio DECIMAL(10,2),
     Codigo_numeral VARCHAR(10),
     Codigo_japon VARCHAR(45),
-    Modelo VARCHAR(45),
     Estanteria VARCHAR(10),
-    Caja enum('A','B','C','D'),
+    Caja ENUM('A','B','C','D'),
     Stock INT,
     Apartado INT,
-    origen varchar (200),
     Estatus TINYINT,
-    id_marca int,
+    id_marca INT,
     FOREIGN KEY (id_marca) REFERENCES marca_proveedor(id)
 );
 
@@ -72,18 +70,26 @@ CREATE TABLE clientes (
     Regimen_Fiscal VARCHAR(45),
     Direccion TEXT,
     contacto_principal VARCHAR(15), 
-    correo_contacto VARCHAR(300),    -- NUEVO: Correo del contacto
+    correo_contacto VARCHAR(300),
     CP VARCHAR(10),
     nombre_constancia VARCHAR(255), 
     ruta_constancia TEXT,
     fecha_constancia DATETIME NULL,
-    id_asesor INT,
     Estatus TINYINT,
     fecha_registro DATE,
-    asesor_tipo ENUM('Asesor propio','Asignado por la sucursal'),
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id)
+    tiene_credito TINYINT(1) DEFAULT 0,  
+    limite_credito DECIMAL(12,2) DEFAULT 0.00 
 );
 
+CREATE TABLE cliente_asesor (
+    id_cliente INT,
+    id_asesor INT,
+    asesor_tipo ENUM('Asesor propio','Asignado por la sucursal'),
+    marcas_asignadas VARCHAR(255) NULL, -- Ej: "Marca A, Marca B"
+    PRIMARY KEY (id_cliente, id_asesor),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id) ON DELETE CASCADE
+);
 -- 4. Tabla Cotizaciones (Depende de Clientes)
 CREATE TABLE cotizaciones (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -102,8 +108,15 @@ CREATE TABLE cotizaciones (
     subtotal DECIMAL(10,2),
     iva DECIMAL(10,2),
     total DECIMAL(10,2),
+    
+    -- NUEVAS COLUMNAS PARA EL MÓDULO DE PROYECTOS
+    id_proyecto INT NULL COMMENT 'Enlace al proyecto de soporte (si aplica)',
+    num_revision INT DEFAULT 0 COMMENT 'Contador de modificaciones hechas por el cliente',
+    
+    -- LLAVES FORÁNEAS
     FOREIGN KEY (id_cliente) REFERENCES clientes(id),
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id) -- NUEVO: Relación con el asesor creador
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_proyecto) REFERENCES proyectos_soporte(id) ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 
@@ -111,14 +124,17 @@ CREATE TABLE cotizaciones (
 
 CREATE TABLE movimientos (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    id_producto INT,
-    id_asesor INT, -- Aseguramos que el asesor que registró el movimiento exista
-    id_cliente INT NULL, -- Permite NULL porque las entradas o mermas no llevan cliente
-    tipo_movimiento ENUM('Entrada', 'Salida', 'Ajuste'), 
-    fecha DATETIME,
-    cantidad INT,
-    destino ENUM('Almacen', 'Pedido'),
+    id_producto INT NULL,           -- NULL cuando se mueva un demo
+    id_demo INT NULL,               -- NULL cuando se mueva un producto normal
+    id_asesor INT NOT NULL,         
+    id_cliente INT NULL,            
+    empresa_no_registrada VARCHAR(250) NULL,
+    tipo_movimiento ENUM('Entrada', 'Salida', 'Ajuste') NOT NULL, 
+    fecha DATETIME NOT NULL,
+    cantidad INT NOT NULL,
+    destino ENUM('Almacen', 'Pedido', 'Demostracion') NOT NULL,
     FOREIGN KEY (id_producto) REFERENCES productos(id),
+    FOREIGN KEY (id_demo) REFERENCES stock_demo(id),
     FOREIGN KEY (id_asesor) REFERENCES asesores(id),
     FOREIGN KEY (id_cliente) REFERENCES clientes(id)
 );
@@ -126,16 +142,29 @@ CREATE TABLE movimientos (
 -- 8. Tabla detalles_cotizacion (Depende de Productos y Cotizaciones)
 CREATE TABLE detalles_cotizacion (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    id_producto INT,
     id_cotizacion INT,
+    
+    -- REFERENCIA AL CATÁLOGO (Opcional si es un producto manual)
+    id_producto INT NULL, 
+    
+    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
+    codigo_manual VARCHAR(100) NULL, 
+    descripcion_manual VARCHAR(250) NULL, 
+    extra_descripcion_manual TEXT NULL, 
+    
+    -- DATOS DE LA PARTIDA
     cantidad_producto INT,
-    origen VARCHAR(150),  -- MOVIDO AQUÍ: Texto extra para este producto específico
-    tiempo_entrega VARCHAR(100),     -- NUEVO: Ej. "1-2 DIAS SPV" o "INMEDIATO"
+    origen VARCHAR(150),             -- Texto extra para este producto específico (Ej. AVION 30%)
+    tiempo_entrega VARCHAR(100),     -- Ej. "1-2 DIAS SPV" o "INMEDIATO"
+    
+    -- PRECIOS Y COSTOS EXTRA
     precio_unitario_cotizado DECIMAL(10,2),
+    costo_flete DECIMAL(10,2) DEFAULT 0.00, -- Costo de traer el producto, si aplica
+    moneda_flete ENUM('MXN','USD') NOT NULL DEFAULT 'MXN',
+    -- LLAVES FORÁNEAS
     FOREIGN KEY (id_producto) REFERENCES productos(id),
     FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
 );
-
 -- 9. Tabla Pedidos (Depende de Clientes, Asesores y Cotizaciones)
 CREATE TABLE pedidos (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -208,11 +237,25 @@ CREATE TABLE detalles_pedido_proveedor (
 CREATE TABLE detalles_pedido (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido INT NOT NULL,
-    id_producto INT NOT NULL,
+    
+    -- REFERENCIA AL CATÁLOGO (Ahora es Opcional/NULL)
+    id_producto INT NULL,
+    
+    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
+    codigo_manual VARCHAR(100) NULL,
+    descripcion_manual VARCHAR(250) NULL,
+    extra_descripcion_manual TEXT NULL,
+    
+    -- CANTIDADES
     cantidad INT NOT NULL,
-    cantidad_surtida INT NOT NULL,
+    cantidad_surtida INT NOT NULL DEFAULT 0,
+    
+    -- COSTOS
     precio_unitario DECIMAL(10,2) NOT NULL,
+    costo_flete DECIMAL(10,2) DEFAULT 0.00,
+    
     estatus_surtido TINYINT DEFAULT 0, -- 0: Pendiente, 1: Surtido/Descontado
+    
     FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
     FOREIGN KEY (id_producto) REFERENCES productos(id)
 );
@@ -220,27 +263,32 @@ CREATE TABLE detalles_pedido (
 -- 5. Tabla Vales_salida (Depende de Asesores y Clientes)
 CREATE TABLE vales_salida (
     id INT AUTO_INCREMENT PRIMARY KEY,
-	consecutivo_anual INT,
-    id_asesor INT,
-    id_cliente INT,
-    id_pedido INT,
-    fecha DATETIME,
+    consecutivo_anual INT NOT NULL,
+    id_asesor INT NOT NULL,
+    id_cliente INT NULL,            -- Permitimos NULL en caso de que visiten una empresa no registrada
+    empresa_no_registrada VARCHAR(550) NULL,
+    id_pedido INT NULL,             -- NULL si el vale es para una demostración
+    id_visita INT NULL,             -- NULL si el vale es para una venta normal
+    tipo_vale ENUM('Venta', 'Demostracion') DEFAULT 'Venta',
+    fecha DATETIME NOT NULL,
     comentario VARCHAR(255) NULL,
+    alerta_enviada TINYINT DEFAULT 0,
+    estatus TINYINT DEFAULT 0,
     FOREIGN KEY (id_asesor) REFERENCES asesores(id),
     FOREIGN KEY (id_cliente) REFERENCES clientes(id),
     FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
-    alerta_enviada tinyint,
-    estatus tinyint
+    FOREIGN KEY (id_visita) REFERENCES visitas_demostracion(id)
 );
-
 -- 6. Tabla detalles_vale (Depende de Productos y Vales_salida)
 CREATE TABLE detalles_vale (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    id_producto INT,
-    id_vale INT,
-    piezas INT,
+    id_vale INT NOT NULL,
+    id_producto INT NULL,           -- NULL si se están sacando equipos demo
+    id_demo INT NULL,               -- NULL si se están sacando productos de venta
+    piezas INT NOT NULL,
+    FOREIGN KEY (id_vale) REFERENCES vales_salida(id) ON DELETE CASCADE,
     FOREIGN KEY (id_producto) REFERENCES productos(id),
-    FOREIGN KEY (id_vale) REFERENCES vales_salida(id)
+    FOREIGN KEY (id_demo) REFERENCES stock_demo(id)
 );
 
 -- 12. Tabla Tickets (Depende de Asesores y Clientes)
@@ -260,5 +308,100 @@ CREATE TABLE tickets (
     fecha_cierre DATETIME NULL,
 
     FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id));
+
+
+
+CREATE TABLE stock_demo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_modelo VARCHAR(150) NOT NULL,    -- Nombre o Modelo del equipo
+    descripcion VARCHAR(250),
+    numero_serie VARCHAR(100),              -- Número de serie si aplica
+    id_marca INT,                           -- Relación con marca_proveedor
+    stock INT DEFAULT 0,                    -- Cantidad disponible de este demo
+    estatus TINYINT DEFAULT 1,              -- Ej: 1 (En almacén), 2 (En demostración)
+    FOREIGN KEY (id_marca) REFERENCES marca_proveedor(id)
+);
+
+-- Tabla de Registro: Visitas de Demostración
+CREATE TABLE visitas_demostracion (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha_visita DATE NOT NULL,             -- Fecha en la que se realizó la visita
+    id_tecnico INT NOT NULL,                -- Usuario (Soporte Técnico) que registra
+    id_asesor INT NOT NULL,                 -- Vendedor al que acompañó
+    id_cliente INT NULL,                    -- ID del cliente si ya existe en tu BD
+    empresa_no_registrada VARCHAR(150),     -- Texto libre si la empresa aún no está dada de alta
+    resumen_actividades TEXT,               -- Descripción de lo que se hizo
+    estatus TINYINT,   -- Estatus general de la visita
+    FOREIGN KEY (id_tecnico) REFERENCES asesores(id),
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
     FOREIGN KEY (id_cliente) REFERENCES clientes(id)
 );
+
+-- Tabla Relacional: Demos llevados en la visita
+CREATE TABLE detalle_visita_demos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_visita INT NOT NULL,                 -- Referencia a la visita
+    id_demo INT NOT NULL,                   -- Referencia al producto demo
+    cantidad INT DEFAULT 1,                 -- Por si llevan más de una pieza del mismo modelo
+    estatus_retorno VARCHAR(50),            -- Ej: 'Regresó a oficina', 'Se quedó a prueba'
+    FOREIGN KEY (id_visita) REFERENCES visitas_demostracion(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_demo) REFERENCES stock_demo(id)
+);
+
+CREATE TABLE proyectos_soporte (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_proyecto VARCHAR(150) NOT NULL,
+    descripcion TEXT NOT NULL,
+    
+    -- Relación con el técnico (asesor) que lo atiende
+    id_tecnico INT NOT NULL,
+    
+    -- Cliente destino (Registrado o eventual)
+    id_cliente INT NULL,
+    empresa_no_registrada VARCHAR(150) NULL,
+    
+    -- Tiempos de resolución
+    fecha_alta DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_termino DATETIME NULL,
+    
+    -- Métricas de desempeño comercial
+    se_cotizo TINYINT DEFAULT 0 COMMENT '0: No, 1: Sí',
+    
+    -- Control de flujo
+    estatus TINYINT DEFAULT 1 COMMENT '1: Activo, 2: Completado, 0: Cancelado',
+    
+    -- Llaves foráneas (Ajusta el nombre de tus tablas si es diferente)
+    FOREIGN KEY (id_tecnico) REFERENCES asesores(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE materiales_proyecto (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_proyecto INT NOT NULL,
+    id_producto INT NOT NULL,
+     nombre_modelo VARCHAR(150) NULL,
+     marca VARCHAR(100) NULL,
+     codigo varchar(200) null,
+    cantidad INT NOT NULL DEFAULT 1,
+    
+    FOREIGN KEY (id_proyecto) REFERENCES proyectos_soporte(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE bitacora_avances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_proyecto INT NOT NULL,
+     estatus_anterior TINYINT NULL,
+    estatus_nuevo    TINYINT NULL,
+    id_usuario       INT NULL,
+    tipo_evento      VARCHAR(30) NOT NULL DEFAULT 'comentario',
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    comentarios TEXT NOT NULL,
+    
+    FOREIGN KEY (id_proyecto) REFERENCES proyectos_soporte(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_bitacora_asesor
+        FOREIGN KEY (id_usuario) REFERENCES asesores(id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

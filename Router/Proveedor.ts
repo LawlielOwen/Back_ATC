@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ProveedorController } from '../Controller/ProveedorController'; // Asegúrate de que la ruta coincida con tu carpeta
+import { ProveedorController } from '../Controller/ProveedorController'; 
 
 const router = Router();
 

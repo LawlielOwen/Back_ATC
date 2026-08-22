@@ -34,44 +34,62 @@ CREATE PROCEDURE sp_agregar_cliente(
     IN cp_c VARCHAR(10),
     IN nombreCon_c VARCHAR(255),
     IN rutaCon_c TEXT,
+    IN tiene_credito_c TINYINT,       -- NUEVO: 0 = No, 1 = Sí
+    IN limite_credito_c DECIMAL(12,2),-- NUEVO: Límite de crédito
     IN asesor_c INT,
-    IN asesor_tipo_c ENUM('Asesor propio', 'Asignado por la sucursal')
+    IN asesor_tipo_c ENUM('Asesor propio', 'Asignado por la sucursal'),
+    IN marcas_c VARCHAR(255)          -- NUEVO: Marcas asignadas
 )
 BEGIN
+    DECLARE v_id_cliente INT;
+
+    -- 1. Insertar datos en la tabla principal (ya no lleva id_asesor)
     INSERT INTO clientes (
         Nombre, RFC, Razon_social, Regimen_Fiscal, Direccion,
         contacto_principal, correo_contacto, CP, nombre_constancia,
-        ruta_constancia, fecha_constancia, id_asesor, Estatus,
-        fecha_registro, asesor_tipo
+        ruta_constancia, fecha_constancia, Estatus,
+        fecha_registro, tiene_credito, limite_credito
     ) VALUES (
         nombre_c, rfc_c, razon_c, regimen_c, direccion_c,
         contacto_c, correo_c, cp_c, nombreCon_c, rutaCon_c,
         IF(rutaCon_c IS NULL OR rutaCon_c = '', NULL, NOW()),
-        asesor_c, 1, CURDATE(), asesor_tipo_c
+        1, CURDATE(), tiene_credito_c, limite_credito_c
     );
 
-    SELECT LAST_INSERT_ID() AS id;  
+    -- 2. Capturar el ID del cliente recién creado
+    SET v_id_cliente = LAST_INSERT_ID();
+
+    -- 3. Crear la relación en la tabla intermedia
+    IF asesor_c IS NOT NULL AND asesor_c > 0 THEN
+        INSERT INTO cliente_asesor (id_cliente, id_asesor, asesor_tipo, marcas_asignadas)
+        VALUES (v_id_cliente, asesor_c, asesor_tipo_c, marcas_c);
+    END IF;
+
+    SELECT v_id_cliente AS id;  
 END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_modificar_cliente(
     IN id_c INT,              
     IN nombre_c VARCHAR(100),
-    IN rfc_c VARCHAR(13),          -- Ajustado a 13 según tu tabla
-    IN razon_c VARCHAR(80),        -- Ajustado a 80 según tu tabla
-    IN regimen_c VARCHAR(45),      -- Ajustado a 45 según tu tabla
+    IN rfc_c VARCHAR(13),
+    IN razon_c VARCHAR(80),
+    IN regimen_c VARCHAR(45),
     IN direccion_c TEXT,
-    IN contacto_c VARCHAR(150),    -- NUEVO
-    IN correo_c VARCHAR(300),      -- NUEVO
+    IN contacto_c VARCHAR(150),
+    IN correo_c VARCHAR(300),
     IN cp_c VARCHAR(10),
     IN nombreCon_c VARCHAR(255), 
     IN rutaCon_c TEXT,
+    IN tiene_credito_c TINYINT,       -- NUEVO
+    IN limite_credito_c DECIMAL(12,2),-- NUEVO
     IN asesor_c INT,
-    IN asesor_tipo_c ENUM('Asesor propio', 'Asignado por la sucursal')
+    IN asesor_tipo_c ENUM('Asesor propio', 'Asignado por la sucursal'),
+    IN marcas_c VARCHAR(255)          -- NUEVO
 )
 BEGIN
+    -- 1. Actualizar los datos base del cliente
     UPDATE clientes 
     SET 
         Nombre = nombre_c,
@@ -79,18 +97,27 @@ BEGIN
         Razon_social = razon_c,
         Regimen_Fiscal = regimen_c,
         Direccion = direccion_c,
-        contacto_principal = contacto_c,  -- NUEVO
-        correo_contacto = correo_c,       -- NUEVO
+        contacto_principal = contacto_c,
+        correo_contacto = correo_c,       
         CP = cp_c,
         nombre_constancia = nombreCon_c,
         ruta_constancia = rutaCon_c,
-        -- Si no hay ruta, guardamos NULL; si la hay, actualizamos la fecha
         fecha_constancia = IF(rutaCon_c IS NULL OR rutaCon_c = '', NULL, NOW()),
-        id_asesor = asesor_c,
-        asesor_tipo = asesor_tipo_c
+        tiene_credito = tiene_credito_c,
+        limite_credito = limite_credito_c
     WHERE id = id_c;
-END $$
 
+    -- 2. Actualizar o insertar la relación con el asesor enviado
+    IF asesor_c IS NOT NULL AND asesor_c > 0 THEN
+        -- Si la relación (id_cliente, id_asesor) ya existe, actualiza el tipo y las marcas. 
+        -- Si no existe, la crea. Así evitamos duplicados o borrar a un segundo asesor.
+        INSERT INTO cliente_asesor (id_cliente, id_asesor, asesor_tipo, marcas_asignadas)
+        VALUES (id_c, asesor_c, asesor_tipo_c, marcas_c)
+        ON DUPLICATE KEY UPDATE 
+            asesor_tipo = VALUES(asesor_tipo),
+            marcas_asignadas = VALUES(marcas_asignadas);
+    END IF;
+END $$
 DELIMITER ;
 
 DELIMITER $$
@@ -148,48 +175,44 @@ DELIMITER $$
 CREATE PROCEDURE sp_agregar_producto(
     IN p_nombre VARCHAR(100),
     IN p_descripcion VARCHAR(250),
-    IN p_extra_descripcion TEXT,      -- NUEVO
+    IN p_extra_descripcion TEXT,
     IN p_precio DECIMAL(10,2),
     IN p_codigo_numeral VARCHAR(10),
     IN p_codigo_japon VARCHAR(45),
-    IN p_modelo VARCHAR(45),
+    -- Se eliminó p_modelo
     IN p_estanteria ENUM('01','02','03','04','05','06','07','08'),
     IN p_caja ENUM('A','B','C','D'),
     IN p_stock INT,
-    IN p_apartado INT,                -- NUEVO
-    IN p_origen VARCHAR(200),         -- NUEVO
+    IN p_apartado INT,
+    -- Se eliminó p_origen
     IN p_id_marca INT
 )
 BEGIN
     INSERT INTO productos (
         Nombre, 
         Descripcion, 
-        ExtraDescripcion,             -- NUEVO
+        ExtraDescripcion, 
         Precio, 
         Codigo_numeral, 
         Codigo_japon, 
-        Modelo, 
         Estanteria, 
         Caja,
         Stock, 
-        Apartado,                     -- NUEVO
-        origen,                       -- NUEVO
+        Apartado, 
         Estatus, 
         id_marca
     ) 
     VALUES (
         p_nombre, 
         p_descripcion, 
-        p_extra_descripcion,          -- NUEVO
+        p_extra_descripcion, 
         p_precio, 
         p_codigo_numeral, 
         p_codigo_japon, 
-        p_modelo, 
         p_estanteria, 
         p_caja,
         p_stock, 
-        p_apartado,                   -- NUEVO
-        p_origen,                     -- NUEVO
+        p_apartado, 
         IF(p_stock > 0, 1, 2),
         p_id_marca
     );
@@ -197,6 +220,43 @@ END $$
 
 DELIMITER ;
 
+DELIMITER $$
+
+CREATE PROCEDURE sp_modificar_producto(
+    IN p_id INT,
+    IN p_nombre VARCHAR(100),
+    IN p_descripcion VARCHAR(250),
+    IN p_extra_descripcion TEXT,
+    IN p_precio DECIMAL(10,2),
+    IN p_codigo_numeral VARCHAR(10),
+    IN p_codigo_japon VARCHAR(45),
+    -- Se eliminó p_modelo
+    IN p_estanteria ENUM('01','02','03','04','05','06','07','08'),
+    IN p_caja ENUM('A','B','C','D'),
+    IN p_stock INT,
+    IN p_apartado INT,
+    -- Se eliminó p_origen
+    IN p_id_marca INT
+)
+BEGIN
+    UPDATE productos 
+    SET 
+        Nombre = p_nombre,
+        Descripcion = p_descripcion,
+        ExtraDescripcion = p_extra_descripcion, 
+        Precio = p_precio,
+        Codigo_numeral = p_codigo_numeral,
+        Codigo_japon = p_codigo_japon,
+        Estanteria = p_estanteria,
+        Caja = p_caja,
+        Stock = p_stock,
+        Apartado = p_apartado, 
+        Estatus = IF(p_stock > 0, 1, 2), 
+        id_marca = p_id_marca
+    WHERE id = p_id;
+END $$
+
+DELIMITER ;
 DELIMITER $$
 
 CREATE PROCEDURE sp_eliminar_producto(
@@ -320,15 +380,14 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_buscar_producto_por_codigo(
-    IN p_codigo VARCHAR(45)
+    IN p_termino VARCHAR(100)
 )
 BEGIN
     SELECT 
         p.id, 
         p.Nombre, 
-        p.Modelo, 
+        p.Descripcion, -- Agregado para dar más contexto en las sugerencias
         p.Codigo_numeral, 
         p.Codigo_japon, 
         p.Stock, 
@@ -337,48 +396,17 @@ BEGIN
         m.Nombre AS Marca
     FROM productos p
     LEFT JOIN marca_proveedor m ON p.id_marca = m.id
-    WHERE p.Codigo_numeral = p_codigo OR p.Codigo_japon = p_codigo
-    LIMIT 1;
-END $$
-
-DELIMITER ;
-
-DELIMITER $$
-
-CREATE PROCEDURE sp_modificar_producto(
-    IN p_id INT,
-    IN p_nombre VARCHAR(100),
-    IN p_descripcion VARCHAR(250),
-    IN p_extra_descripcion TEXT,      -- NUEVO
-    IN p_precio DECIMAL(10,2),
-    IN p_codigo_numeral VARCHAR(10),
-    IN p_codigo_japon VARCHAR(45),
-    IN p_modelo VARCHAR(45),
-    IN p_estanteria ENUM('01','02','03','04','05','06','07','08'),
-    IN p_caja ENUM('A','B','C','D'),
-    IN p_stock INT,
-    IN p_apartado INT,                -- NUEVO
-    IN p_origen VARCHAR(200),         -- NUEVO
-    IN p_id_marca INT
-)
-BEGIN
-    UPDATE productos 
-    SET 
-        Nombre = p_nombre,
-        Descripcion = p_descripcion,
-        ExtraDescripcion = p_extra_descripcion,  -- NUEVO
-        Precio = p_precio,
-        Codigo_numeral = p_codigo_numeral,
-        Codigo_japon = p_codigo_japon,
-        Modelo = p_modelo,
-        Estanteria = p_estanteria,
-        Caja = p_caja,
-        Stock = p_stock,
-        Apartado = p_apartado,                   -- NUEVO
-        origen = p_origen,                       -- NUEVO
-        Estatus = IF(p_stock > 0, 1, 2), 
-        id_marca = p_id_marca
-    WHERE id = p_id;
+    WHERE p.Nombre LIKE CONCAT('%', p_termino, '%')
+       OR p.Codigo_numeral LIKE CONCAT('%', p_termino, '%')
+       OR p.Codigo_japon LIKE CONCAT('%', p_termino, '%')
+    ORDER BY 
+        -- Pequeño truco: Da prioridad a los productos que "empiecen" con lo que el usuario escribe
+        CASE 
+            WHEN p.Nombre LIKE CONCAT(p_termino, '%') THEN 1
+            ELSE 2
+        END, 
+        p.Nombre ASC
+    LIMIT 10;
 END $$
 
 DELIMITER ;
@@ -467,7 +495,6 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_consultar_movimientos(
     IN p_termino VARCHAR(100),     
     IN p_tipo_movimiento VARCHAR(20),
@@ -479,6 +506,9 @@ CREATE PROCEDURE sp_consultar_movimientos(
 )
 BEGIN
 
+    -- =================================================================
+    -- CONSULTA 1: Obtener los registros paginados
+    -- =================================================================
     SELECT 
         id_movimiento,
         tipo_movimiento,
@@ -489,7 +519,7 @@ BEGIN
         nombre_producto,
         Codigo_japon,
         Codigo_numeral,
-        modelo_producto,
+        -- Se eliminó modelo_producto
         marca_producto,
         id_asesor,
         nombre_asesor,
@@ -665,7 +695,7 @@ sp_main: BEGIN
     DECLARE v_id_asesor INT;
     DECLARE v_id_cliente INT;
     DECLARE v_estatus_actual INT;
-    DECLARE v_apartado_actual INT; -- Cambiamos stock por apartado
+    DECLARE v_apartado_actual INT; 
     DECLARE v_nombre_producto VARCHAR(150); 
     
     DECLARE cur_detalles CURSOR FOR 
@@ -701,36 +731,42 @@ sp_main: BEGIN
                 LEAVE read_loop;
             END IF;
 
-            -- 1. Consultamos las existencias en el Apartado, no en el Stock libre
-            SELECT IFNULL(Apartado, 0), Nombre INTO v_apartado_actual, v_nombre_producto 
-            FROM productos WHERE id = v_id_producto FOR UPDATE;
-
-            -- 2. Validamos contra el Apartado
-            IF v_piezas > v_apartado_actual THEN
-                ROLLBACK; 
-                CLOSE cur_detalles; 
-                
-                SELECT CONCAT('Error: Apartado insuficiente. El producto "', v_nombre_producto, '" solo tiene ', v_apartado_actual, ' piezas en reserva.') AS mensaje;
-                
-                LEAVE sp_main; 
-            END IF;
+            -- =========================================================
+            -- MAGIA AQUÍ: Solo validamos y descontamos si el producto existe
+            -- =========================================================
+            IF v_id_producto IS NOT NULL THEN
             
-            INSERT INTO movimientos (id_producto, id_asesor, id_cliente, tipo_movimiento, fecha, cantidad, destino)
-            VALUES (v_id_producto, v_id_asesor, v_id_cliente, 'Salida', NOW(), v_piezas, 'Pedido');
+                -- 1. Consultamos las existencias en el Apartado
+                SELECT IFNULL(Apartado, 0), Nombre INTO v_apartado_actual, v_nombre_producto 
+                FROM productos WHERE id = v_id_producto FOR UPDATE;
 
-            -- 3. Descontamos directamente de la columna Apartado
-            UPDATE productos 
-            SET 
-                Apartado = Apartado - v_piezas
-                -- Nota: Aquí no tocamos el Estatus porque el Estatus refleja si hay Stock libre en almacén,
-                -- y ese Stock libre se debió descontar cuando el producto se pasó a Apartado.
-            WHERE id = v_id_producto;
+                -- 2. Validamos contra el Apartado
+                IF v_piezas > v_apartado_actual THEN
+                    ROLLBACK; 
+                    CLOSE cur_detalles; 
+                    
+                    SELECT CONCAT('Error: Apartado insuficiente. El producto "', v_nombre_producto, '" solo tiene ', v_apartado_actual, ' piezas en reserva.') AS mensaje;
+                    
+                    LEAVE sp_main; 
+                END IF;
+                
+                -- 3. Registramos el movimiento (Opcional, si tu BD permite FK nulas podrías sacarlo del IF)
+                INSERT INTO movimientos (id_producto, id_asesor, id_cliente, tipo_movimiento, fecha, cantidad, destino)
+                VALUES (v_id_producto, v_id_asesor, v_id_cliente, 'Salida', NOW(), v_piezas, 'Pedido');
+
+                -- 4. Descontamos directamente de la columna Apartado
+                UPDATE productos 
+                SET Apartado = Apartado - v_piezas
+                WHERE id = v_id_producto;
+                
+            END IF;
+            -- (Si v_id_producto ES NULL, es un producto manual, no hace nada y el loop continúa)
 
         END LOOP;
         CLOSE cur_detalles;
         
         INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida)
-        VALUES (NOW(), 'Vale Autorizado', v_id_asesor, CONCAT('Tu vale de salida a sido autorizado y el material ha sido descontado.'), 0);
+        VALUES (NOW(), 'Vale Autorizado', v_id_asesor, 'Tu vale de salida ha sido autorizado y el material ha sido descontado.', 0);
         
         COMMIT;
         
@@ -824,20 +860,30 @@ CREATE PROCEDURE sp_obtener_productos_vale(
 BEGIN
     SELECT 
         dv.id_producto,
+        dv.id_demo,
         dv.piezas,
-        p.Codigo_numeral,
+        
+        -- Si es producto toma el Cod_numeral, si es demo toma el numero_serie
+        COALESCE(p.Codigo_numeral, sd.numero_serie) AS Codigo_numeral,
+        
+        -- Los demos no tienen código japón, se irá como NULL y Angular pondrá '-'
         p.Codigo_japon,
-        p.Nombre AS nombre_producto,
-        p.Modelo AS modelo_producto
+        
+        -- Nombre descriptivo del producto o modelo del equipo demo
+        COALESCE(p.Descripcion, sd.nombre_modelo) AS nombre_producto, 
+        
+        -- Modelo corto
+        COALESCE(p.Nombre, sd.nombre_modelo) AS modelo_producto       
+        
     FROM detalles_vale dv
-    INNER JOIN Productos p ON dv.id_producto = p.id
+    LEFT JOIN productos p ON dv.id_producto = p.id
+    LEFT JOIN stock_demo sd ON dv.id_demo = sd.id
     WHERE dv.id_vale = p_id_vale;
 END $$
 
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_consultar_vales(
     IN p_id_asesor INT,
     IN p_busqueda VARCHAR(150),
@@ -875,7 +921,8 @@ BEGIN
         nombre_asesor,
         id_cliente,
         nombre_cliente,
-        orden_compra
+        orden_compra,
+        tipo_vale -- <-- ¡AQUÍ ESTÁ LA MAGIA QUE FALTABA!
     FROM verVales
     WHERE 
         (p_id_asesor IS NULL OR id_asesor = p_id_asesor)
@@ -915,7 +962,6 @@ BEGIN
 END $$
 
 DELIMITER ;
-
 DELIMITER $$
 CREATE PROCEDURE sp_consultar_pedidos(
     IN p_busqueda VARCHAR(150),
@@ -1301,6 +1347,7 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
+
 CREATE PROCEDURE sp_buscar_producto_para_pedido(
     IN p_busqueda VARCHAR(300),
     IN p_id_proveedor INT
@@ -1310,7 +1357,6 @@ BEGIN
         id, 
         Codigo_japon, 
         Codigo_numeral, 
-        Modelo, 
         Nombre, 
         Descripcion,
         Precio,
@@ -1321,23 +1367,26 @@ BEGIN
            Codigo_japon LIKE CONCAT('%', p_busqueda, '%') 
         OR Codigo_numeral LIKE CONCAT('%', p_busqueda, '%')
         OR Nombre LIKE CONCAT('%', p_busqueda, '%')
+        OR Descripcion LIKE CONCAT('%', p_busqueda, '%') -- ¡AQUÍ ESTÁ LA MAGIA!
     )
       AND Estatus IN (1, 2) 
       AND (p_id_proveedor IS NULL OR id_marca = p_id_proveedor) 
 
     ORDER BY 
         CASE 
-            WHEN Codigo_japon = p_busqueda OR Codigo_numeral = p_busqueda THEN 1
+            WHEN Codigo_japon = p_busqueda OR Codigo_numeral = p_busqueda OR Nombre = p_busqueda THEN 1
             WHEN Nombre LIKE CONCAT(p_busqueda, '%') THEN 2
-            WHEN Codigo_japon LIKE CONCAT(p_busqueda, '%') THEN 3
-            WHEN Nombre LIKE CONCAT('% ', p_busqueda, '%') THEN 4
-            ELSE 5 
+            WHEN Descripcion LIKE CONCAT(p_busqueda, '%') THEN 3 -- Prioridad si empieza con la descripción
+            WHEN Codigo_japon LIKE CONCAT(p_busqueda, '%') THEN 4
+            WHEN Nombre LIKE CONCAT('% ', p_busqueda, '%') OR Descripcion LIKE CONCAT('% ', p_busqueda, '%') THEN 5 
+            ELSE 6 
         END ASC,
         LENGTH(Nombre) ASC, 
         Nombre ASC
 
     LIMIT 15;
 END $$
+
 DELIMITER ;
 
 DELIMITER $$
@@ -1414,7 +1463,6 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_modificar_cotizacion(
     IN p_id_cotizacion INT,
     IN p_id_cliente INT,
@@ -1429,6 +1477,14 @@ CREATE PROCEDURE sp_modificar_cotizacion(
     IN p_total DECIMAL(10,2)
 )
 BEGIN
+    DECLARE v_id_proyecto INT;
+
+    -- 1. Verificamos si esta cotización está enlazada a un proyecto
+    SELECT id_proyecto INTO v_id_proyecto 
+    FROM cotizaciones 
+    WHERE id = p_id_cotizacion;
+
+    -- 2. Actualizamos la cotización y sumamos 1 al contador de revisiones
     UPDATE cotizaciones 
     SET 
         id_cliente = p_id_cliente,
@@ -1440,8 +1496,16 @@ BEGIN
         vigencia_dias = p_vigencia_dias,
         subtotal = p_subtotal,
         iva = p_iva,
-        total = p_total
+        total = p_total,
+        num_revision = num_revision + 1 
     WHERE id = p_id_cotizacion;
+
+    -- 3. Si pertenece a un proyecto, actualizamos su estatus a 3 (En Modificación)
+    IF v_id_proyecto IS NOT NULL THEN
+        UPDATE proyectos_soporte 
+        SET estatus = 3
+        WHERE id = v_id_proyecto;
+    END IF;
 END $$
 
 DELIMITER ;
@@ -1534,19 +1598,19 @@ BEGIN
         id, 
         Codigo_japon, 
         Codigo_numeral, 
-        Modelo, 
         Nombre, 
         Descripcion,
         ExtraDescripcion,
         Precio,       
         Stock,
-        origen,
+        -- Se eliminó 'origen' porque ya no existe en el catálogo maestro
         Estatus 
     FROM productos 
     WHERE (
            Codigo_japon LIKE CONCAT('%', p_busqueda, '%') 
         OR Codigo_numeral LIKE CONCAT('%', p_busqueda, '%')
-        OR Nombre LIKE CONCAT('%', p_busqueda, '%') 
+        OR Nombre LIKE CONCAT('%', p_busqueda, '%')
+        OR Descripcion LIKE CONCAT('%', p_busqueda, '%') -- Ahora busca también por la descripción
     )
       AND Estatus IN (1, 2) 
       AND (p_id_proveedor IS NULL OR id_marca = p_id_proveedor) 
@@ -1556,20 +1620,23 @@ BEGIN
     -- ========================================================
     ORDER BY 
         CASE 
-            -- Nivel 1: Coincidencia EXACTA del código (Ej: Buscó el código completo)
-            WHEN Codigo_japon = p_busqueda OR Codigo_numeral = p_busqueda THEN 1
+            -- Nivel 1: Coincidencia EXACTA del código o modelo
+            WHEN Codigo_japon = p_busqueda OR Codigo_numeral = p_busqueda OR Nombre = p_busqueda THEN 1
             
-            -- Nivel 2: El nombre EMPIEZA con lo que buscó (Ej: "To" -> "Torreta")
+            -- Nivel 2: El modelo EMPIEZA con lo que buscó
             WHEN Nombre LIKE CONCAT(p_busqueda, '%') THEN 2
             
-            -- Nivel 3: El código EMPIEZA con lo que buscó
-            WHEN Codigo_japon LIKE CONCAT(p_busqueda, '%') THEN 3
+            -- Nivel 3: El nombre descriptivo EMPIEZA con lo que buscó (Ej: "To" -> "Torreta")
+            WHEN Descripcion LIKE CONCAT(p_busqueda, '%') THEN 3
             
-            -- Nivel 4: Es el inicio de una palabra dentro del texto (Ej: "Luz To" -> Espacio antes del 'To')
-            WHEN Nombre LIKE CONCAT('% ', p_busqueda, '%') THEN 4
+            -- Nivel 4: El código Japón EMPIEZA con lo que buscó
+            WHEN Codigo_japon LIKE CONCAT(p_busqueda, '%') THEN 4
             
-            -- Nivel 5: Lo contiene en medio de la palabra (Ej: "Fotoeléctrico"). Se van al final.
-            ELSE 5 
+            -- Nivel 5: Es el inicio de una palabra dentro del texto
+            WHEN Nombre LIKE CONCAT('% ', p_busqueda, '%') OR Descripcion LIKE CONCAT('% ', p_busqueda, '%') THEN 5
+            
+            -- Nivel 6: Lo contiene en medio de la palabra. Se van al final.
+            ELSE 6 
         END ASC,
         
         -- Criterio de desempate: Orden alfabético y los más cortos primero
@@ -1582,7 +1649,6 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_convertir_cotizacion_pedido(
     IN p_id_cotizacion INT,
     IN p_orden_compra VARCHAR(100),
@@ -1597,13 +1663,16 @@ BEGIN
     DECLARE v_fecha_cotizacion DATE;
     DECLARE v_fecha_limite_calculada DATE;
     
-    -- NUEVAS VARIABLES PARA MONEDA
+    -- VARIABLES PARA MONEDA
     DECLARE v_moneda VARCHAR(50);
     DECLARE v_tipo_cambio DECIMAL(10,4);
+    
+    -- NUEVA VARIABLE PARA EL PROYECTO
+    DECLARE v_id_proyecto INT;
 
-    -- Obtenemos TODO lo necesario de la cotización, incluyendo moneda
-    SELECT id_cliente, Estatus, id_asesor, vigencia_dias, fecha, moneda, tipo_cambio
-    INTO v_id_cliente, v_estatus_cotizacion, v_id_asesor, v_vigencia_dias, v_fecha_cotizacion, v_moneda, v_tipo_cambio
+    -- Obtenemos TODO lo necesario de la cotización, incluyendo el id_proyecto
+    SELECT id_cliente, Estatus, id_asesor, vigencia_dias, fecha, moneda, tipo_cambio, id_proyecto
+    INTO v_id_cliente, v_estatus_cotizacion, v_id_asesor, v_vigencia_dias, v_fecha_cotizacion, v_moneda, v_tipo_cambio, v_id_proyecto
     FROM cotizaciones
     WHERE id = p_id_cotizacion;
 
@@ -1624,39 +1693,50 @@ BEGIN
         SET Estatus = 2 
         WHERE id = p_id_cotizacion;
 
-        -- 1. Insertamos el pedido
+        -- 1. Insertamos el pedido (Encabezado)
         INSERT INTO pedidos (
-    id_cliente, id_asesor, id_cotizacion, fecha, fecha_limite, 
-    Estatus, alerta_enviada, orden_compra -- NUEVO
-) VALUES (
-    v_id_cliente, v_id_asesor, p_id_cotizacion, CURDATE(), v_fecha_limite_calculada, 
-    1, 0, p_orden_compra -- NUEVO
-);
+            id_cliente, id_asesor, id_cotizacion, fecha, fecha_limite, 
+            Estatus, alerta_enviada, orden_compra 
+        ) VALUES (
+            v_id_cliente, v_id_asesor, p_id_cotizacion, CURDATE(), v_fecha_limite_calculada, 
+            1, 0, p_orden_compra 
+        );
         
         SET p_id_pedido = LAST_INSERT_ID();
         
+        -- 2. TRASPASO DE PARTIDAS
         INSERT INTO detalles_pedido (
-            id_pedido, 
-            id_producto, 
-            cantidad, 
-            precio_unitario, 
-            estatus_surtido
+            id_pedido, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, 
+            cantidad, precio_unitario, costo_flete, estatus_surtido
         )
         SELECT 
-            p_id_pedido,
-            id_producto, 
+            p_id_pedido, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, 
             cantidad_producto, 
-	
-            IF(v_moneda = 'USD' AND v_tipo_cambio > 0, 
-               precio_unitario_cotizado / v_tipo_cambio, 
-               precio_unitario_cotizado),
-               
+            IF(v_moneda = 'USD' AND v_tipo_cambio > 0, precio_unitario_cotizado / v_tipo_cambio, precio_unitario_cotizado),
+            IF(v_moneda = 'USD' AND v_tipo_cambio > 0, costo_flete / v_tipo_cambio, costo_flete),
             0 
         FROM detalles_cotizacion
         WHERE id_cotizacion = p_id_cotizacion;
+        
         -- =========================================================
+        -- 3. MAGIA PARA EL MÓDULO DE PROYECTOS (ESTATUS 4 Y BITÁCORA)
+        -- =========================================================
+        IF v_id_proyecto IS NOT NULL THEN
+            -- Actualizamos el proyecto a Estatus 4 (En Ejecución / Instalación)
+            UPDATE proyectos_soporte 
+            SET estatus = 4 
+            WHERE id = v_id_proyecto;
+            
+            -- Insertamos el registro automático en la bitácora
+            INSERT INTO bitacora_avances (id_proyecto, fecha_registro, comentarios)
+            VALUES (
+                v_id_proyecto, 
+                NOW(), 
+                CONCAT('Sistema: Cotización aceptada y convertida a pedido (OC: ', IFNULL(p_orden_compra, 'N/A'), '). El proyecto pasa a fase de Ejecución / Instalación.')
+            );
+        END IF;
 
-        SET p_mensaje = 'Éxito: Cotización convertida a pedido correctamente con sus detalles en la moneda original.';
+        SET p_mensaje = 'Éxito: Cotización convertida a pedido correctamente, incluyendo productos manuales.';
 
         COMMIT;
     END IF;
@@ -1671,7 +1751,7 @@ CREATE PROCEDURE sp_buscar_filtrar_pedidos(
     IN p_estatus INT,
     IN p_fecha_inicio DATE,
     IN p_fecha_fin DATE,
-    IN p_id_asesor INT,          -- NUEVO: NULL = ve todo, con valor = solo lo suyo
+    IN p_id_asesor INT,          
     IN p_limite INT,
     IN p_offset INT
 )
@@ -1684,10 +1764,17 @@ BEGIN
          nombre_cliente LIKE CONCAT('%', p_busqueda, '%') OR 
          Razon_social LIKE CONCAT('%', p_busqueda, '%') OR
          id LIKE CONCAT('%', p_busqueda, '%'))
-        AND (p_estatus = -1 OR Estatus = p_estatus)
+        
+        -- LA MAGIA ESTÁ AQUÍ: Evaluamos nuestro estado virtual '99'
+        AND (
+            p_estatus = -1 
+            OR (p_estatus = 99 AND Estatus IN (1, 3)) 
+            OR Estatus = p_estatus
+        )
+        
         AND (p_fecha_inicio IS NULL OR DATE(fecha_pedido) >= p_fecha_inicio)
         AND (p_fecha_fin IS NULL OR DATE(fecha_pedido) <= p_fecha_fin)
-        AND (p_id_asesor IS NULL OR id_asesor = p_id_asesor)   -- NUEVO
+        AND (p_id_asesor IS NULL OR id_asesor = p_id_asesor)   
         
     ORDER BY id DESC
         
@@ -1701,10 +1788,17 @@ BEGIN
          nombre_cliente LIKE CONCAT('%', p_busqueda, '%') OR 
          Razon_social LIKE CONCAT('%', p_busqueda, '%') OR
          id LIKE CONCAT('%', p_busqueda, '%'))
-        AND (p_estatus = -1 OR Estatus = p_estatus)
+         
+        -- REPLICAMOS LA REGLA EN EL COUNT
+        AND (
+            p_estatus = -1 
+            OR (p_estatus = 99 AND Estatus IN (1, 3)) 
+            OR Estatus = p_estatus
+        )
+        
         AND (p_fecha_inicio IS NULL OR DATE(fecha_pedido) >= p_fecha_inicio)
         AND (p_fecha_fin IS NULL OR DATE(fecha_pedido) <= p_fecha_fin)
-        AND (p_id_asesor IS NULL OR id_asesor = p_id_asesor);  -- NUEVO
+        AND (p_id_asesor IS NULL OR id_asesor = p_id_asesor);  
 END $$
 DELIMITER ;
 
@@ -1982,14 +2076,13 @@ WHERE id = p_id_pedido;
 END $$
 DELIMITER ;
 DELIMITER $$
-
 CREATE PROCEDURE sp_agregar_asesor(
     IN p_Nombre VARCHAR(200),
     IN p_app VARCHAR(80),
     IN p_apm VARCHAR(80),
     IN p_telefono VARCHAR(14),
     IN p_contra VARCHAR(255),
-    IN p_Rol ENUM('Almacen', 'Cotizador', 'Administrador', 'Asesor'),
+    IN p_Rol ENUM('Almacen', 'Cotizador', 'Administrador', 'Asesor', 'Soporte Tecnico'),
     IN p_Fecha_nacimiento DATE,
     IN p_Fecha_contratacion DATE,
     IN p_Correo VARCHAR(100),
@@ -2035,14 +2128,13 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE PROCEDURE sp_modificar_asesor(
     IN p_id INT,
     IN p_Nombre VARCHAR(200),
     IN p_app VARCHAR(80),
     IN p_apm VARCHAR(80),
     IN p_telefono VARCHAR(14),
-    IN p_Rol ENUM('Almacen', 'Cotizador', 'Administrador', 'Asesor'),
+    IN p_Rol ENUM('Almacen', 'Cotizador', 'Administrador', 'Asesor', 'Soporte Tecnico'),
     IN p_Fecha_nacimiento DATE,
     IN p_Fecha_contratacion DATE,
     IN p_Correo VARCHAR(100),
@@ -2080,7 +2172,6 @@ BEGIN
 END $$
 
 DELIMITER ;
-
 DELIMITER $$
 
 DROP PROCEDURE IF EXISTS sp_eliminar_asesor $$
@@ -2218,6 +2309,7 @@ END $$
 DELIMITER ;
 
 DELIMITER $$
+
 CREATE PROCEDURE sp_tasa_conversion(
     IN p_filtro_moneda VARCHAR(20), 
     IN p_id_cliente INT,
@@ -2253,9 +2345,6 @@ BEGIN
         GROUP BY id_cliente
     ) cot ON c.id = cot.id_cliente
     LEFT JOIN (
-        -- COHORTE: solo pedidos ligados a una cotización generada ESTE MES.
-        -- Así "Vendido" y "Cotizado" hablan del mismo lote de cotizaciones,
-        -- sin importar en qué fecha se terminó de facturar el pedido.
         SELECT 
             p.id_cliente, 
             SUM(
@@ -2267,25 +2356,25 @@ BEGIN
                 END
             ) * 1.16 AS total_vendido
         FROM pedidos p
-        -- INNER JOIN (antes era LEFT JOIN): un pedido sin cotización válida
-        -- no puede clasificarse en ninguna moneda, así que no debe contar
-        -- en ninguna vista filtrada. Esto también elimina la fuga de moneda.
         INNER JOIN cotizaciones c_orig ON p.id_cotizacion = c_orig.id
         INNER JOIN detalles_pedido dp ON dp.id_pedido = p.id
-        WHERE MONTH(c_orig.fecha) = MONTH(CURRENT_DATE())   -- antes: p.fecha
+        WHERE MONTH(c_orig.fecha) = MONTH(CURRENT_DATE())   
           AND YEAR(c_orig.fecha) = YEAR(CURRENT_DATE())
           AND p.Estatus = 2
           AND (p_id_asesor IS NULL OR p_id_asesor = 0 OR p.id_asesor = p_id_asesor) 
           AND (p_filtro_moneda = 'GLOBAL' 
                OR (p_filtro_moneda = 'MXN' AND c_orig.moneda = 'MONEDA NACIONAL')
                OR (p_filtro_moneda = 'USD' AND c_orig.moneda = 'USD'))
-               -- ya no hay "OR c_orig.moneda IS NULL"
         GROUP BY p.id_cliente
     ) ped ON c.id = ped.id_cliente
 
     WHERE (cot.total_cotizado > 0 OR ped.total_vendido > 0)
       AND (p_id_cliente IS NULL OR c.id = p_id_cliente)
-      AND (p_id_asesor IS NULL OR p_id_asesor = 0 OR c.id_asesor = p_id_asesor) 
+      -- ¡AQUÍ ESTÁ LA MAGIA! Buscamos en la nueva tabla intermedia
+      AND (p_id_asesor IS NULL OR p_id_asesor = 0 OR EXISTS (
+          SELECT 1 FROM cliente_asesor ca 
+          WHERE ca.id_cliente = c.id AND ca.id_asesor = p_id_asesor
+      )) 
     ORDER BY Cotizado DESC;
 END $$
 DELIMITER ;
@@ -2524,32 +2613,6 @@ sp_main: BEGIN
 END $$
 
 DELIMITER ;
-
-DELIMITER $$
-CREATE PROCEDURE sp_pedidos_disponibles_para_vale(
-    IN p_id_asesor INT
-)
-BEGIN
-    SELECT 
-        p.id,
-        p.id_cliente,
-        c.Nombre AS nombre_cliente,
-        p.orden_compra,
-        p.fecha,
-        p.id_cotizacion
-    FROM pedidos p
-    INNER JOIN clientes c ON c.id = p.id_cliente
-    WHERE p.id_asesor = p_id_asesor
-      AND p.Estatus = 2  
-      AND NOT EXISTS (
-          SELECT 1 FROM vales_salida v 
-          WHERE v.id_pedido = p.id 
-            AND v.estatus IN (0, 1)   
-      )
-    ORDER BY p.fecha DESC;
-END $$
-DELIMITER ;
-
 DELIMITER $$
 CREATE PROCEDURE sp_buscar_tickets(
     IN p_busqueda VARCHAR(150),
@@ -2743,3 +2806,1185 @@ BEGIN
     
 END $$
 DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_pagar_pedido_con_credito(
+    IN p_id_pedido INT,
+    OUT p_mensaje VARCHAR(255)
+)
+sp_main: BEGIN
+    -- 1. ZONA DE DECLARACIONES
+    DECLARE v_id_cliente INT;
+    DECLARE v_id_cotizacion INT;
+    DECLARE v_estatus_actual INT;
+    DECLARE v_moneda VARCHAR(10);              -- NUEVO: moneda del pedido/cotizacion
+    DECLARE v_tiene_credito TINYINT(1);
+    DECLARE v_limite_credito DECIMAL(12,2);
+    DECLARE v_total_pedido DECIMAL(12,2);
+
+    -- Variables para el Stock
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_pedidos_incompletos INT DEFAULT 0;
+    DECLARE v_id_producto INT;
+    DECLARE v_cantidad_pedida INT;
+    DECLARE v_cantidad_ya_surtida INT;
+    DECLARE v_stock_libre INT;
+    DECLARE v_cantidad_a_apartar INT DEFAULT 0; -- FIX: default 0 (antes sin inicializar)
+    DECLARE v_falta_surtir INT;
+
+    -- Cursores y Manejadores de Errores
+    DECLARE cur_detalles CURSOR FOR
+        SELECT id_producto, cantidad, cantidad_surtida
+        FROM detalles_pedido WHERE id_pedido = p_id_pedido;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_mensaje = 'Error interno: Se canceló la operación y no se descontó el crédito.';
+    END;
+
+    -- 2. VALIDACIONES INICIALES (fuera de transacción, solo para respuesta rápida al usuario)
+    SELECT id_cliente, id_cotizacion, Estatus
+    INTO v_id_cliente, v_id_cotizacion, v_estatus_actual
+    FROM pedidos WHERE id = p_id_pedido;
+
+    IF v_estatus_actual IS NULL THEN
+        SET p_mensaje = 'Error: El pedido especificado no existe.';
+        LEAVE sp_main;
+    END IF;
+
+    IF v_estatus_actual <> 1 THEN
+        SET p_mensaje = 'Este pedido ya fue procesado anteriormente.';
+        LEAVE sp_main;
+    END IF;
+
+    -- Traemos moneda y total desde la cotización vinculada
+    -- NOTA: ajustar el nombre de columna si tu tabla cotizaciones usa otro nombre (ej. tipo_moneda)
+    SELECT total, moneda INTO v_total_pedido, v_moneda
+    FROM cotizaciones WHERE id = v_id_cotizacion;
+
+    -- 3. VALIDACIÓN DE MONEDA (Opción 1: crédito solo disponible en MXN)
+    IF v_moneda IS NULL OR v_moneda <> 'MXN' THEN
+        SET p_mensaje = 'El pago con línea de crédito solo está disponible para pedidos en MXN. Este pedido está en otra moneda; utiliza el flujo de subir recibo de pago.';
+        LEAVE sp_main;
+    END IF;
+
+    -- Pre-check de crédito (para dar feedback rápido; el check real y definitivo
+    -- ocurre más abajo, ya con el registro bloqueado dentro de la transacción)
+    SELECT tiene_credito, limite_credito INTO v_tiene_credito, v_limite_credito
+    FROM clientes WHERE id = v_id_cliente;
+
+    IF v_tiene_credito = 0 OR v_tiene_credito IS NULL THEN
+        SET p_mensaje = 'El cliente no tiene una línea de crédito autorizada.';
+        LEAVE sp_main;
+    END IF;
+
+    IF v_limite_credito < v_total_pedido THEN
+        SET p_mensaje = CONCAT('Crédito insuficiente. Saldo: $', v_limite_credito, ' | Total a pagar: $', v_total_pedido);
+        LEAVE sp_main;
+    END IF;
+
+    -- ==========================================
+    -- INICIA LA TRANSACCIÓN SEGURA
+    -- ==========================================
+    START TRANSACTION;
+
+    -- 4. RE-VALIDAR Y DESCONTAR EL CRÉDITO, CON BLOQUEO DE FILA
+    -- FIX: FOR UPDATE evita que dos cobros simultáneos al mismo cliente
+    -- sobregiren el límite (ambos pasarían el pre-check con el saldo viejo).
+    SELECT limite_credito INTO v_limite_credito
+    FROM clientes WHERE id = v_id_cliente FOR UPDATE;
+
+    IF v_limite_credito < v_total_pedido THEN
+        ROLLBACK;
+        SET p_mensaje = CONCAT('Crédito insuficiente. Saldo: $', v_limite_credito, ' | Total a pagar: $', v_total_pedido);
+        LEAVE sp_main;
+    END IF;
+
+    UPDATE clientes
+    SET limite_credito = limite_credito - v_total_pedido
+    WHERE id = v_id_cliente;
+
+    -- 5. APARTADO DE STOCK AUTOMÁTICO
+    OPEN cur_detalles;
+    read_loop: LOOP
+        FETCH cur_detalles INTO v_id_producto, v_cantidad_pedida, v_cantidad_ya_surtida;
+        IF v_done THEN LEAVE read_loop; END IF;
+
+        SET v_cantidad_a_apartar = 0;  -- FIX: reset en cada iteración (antes arrastraba el valor previo)
+
+        -- FIX: FOR UPDATE evita condición de carrera sobre el stock del producto
+        SELECT Stock INTO v_stock_libre FROM productos WHERE id = v_id_producto FOR UPDATE;
+        SET v_falta_surtir = v_cantidad_pedida - v_cantidad_ya_surtida;
+
+        IF v_falta_surtir > 0 AND v_stock_libre > 0 THEN
+            IF v_stock_libre >= v_falta_surtir THEN
+                SET v_cantidad_a_apartar = v_falta_surtir;
+            ELSE
+                SET v_cantidad_a_apartar = v_stock_libre;
+            END IF;
+
+            UPDATE productos
+            SET Stock = Stock - v_cantidad_a_apartar,
+                Apartado = Apartado + v_cantidad_a_apartar
+            WHERE id = v_id_producto;
+
+            UPDATE detalles_pedido
+            SET cantidad_surtida = cantidad_surtida + v_cantidad_a_apartar
+            WHERE id_pedido = p_id_pedido AND id_producto = v_id_producto;
+        END IF;
+
+        IF (v_cantidad_ya_surtida + v_cantidad_a_apartar) < v_cantidad_pedida THEN
+            SET v_pedidos_incompletos = 1;
+        END IF;
+    END LOOP;
+    CLOSE cur_detalles;
+
+    -- 6. ACTUALIZAR EL PEDIDO
+    UPDATE pedidos
+    SET
+        nombre_factura = 'PAGO CON CRÉDITO',
+        factura_ruta = 'SISTEMA_INTERNO',
+        fecha_factura = NOW(),
+        Estatus = IF(v_pedidos_incompletos = 1, 3, 2) -- 3 Incompleto, 2 Completado
+    WHERE id = p_id_pedido;
+
+    COMMIT;
+
+    -- 7. MENSAJE FINAL
+    IF v_pedidos_incompletos = 1 THEN
+        SET p_mensaje = 'Cobro exitoso. Pedido incompleto (Falta stock de algunos productos).';
+    ELSE
+        SET p_mensaje = 'Cobro exitoso y pedido aceptado con stock completo.';
+    END IF;
+
+END $$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_agregar_demo(
+    IN p_nombre_modelo VARCHAR(150),
+    IN p_descripcion VARCHAR(250),
+    IN p_numero_serie VARCHAR(100),
+    IN p_id_marca INT,
+    IN p_stock INT
+)
+BEGIN
+    INSERT INTO stock_demo (
+        nombre_modelo, 
+        descripcion, 
+        numero_serie, 
+        id_marca, 
+        stock, 
+        estatus
+    ) 
+    VALUES (
+        p_nombre_modelo, 
+        p_descripcion, 
+        p_numero_serie, 
+        p_id_marca, 
+        p_stock, 
+        IF(p_stock > 0, 1, 2) -- Asigna 1 si hay stock, 2 si no hay
+    );
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_modificar_demo(
+    IN p_id INT,
+    IN p_nombre_modelo VARCHAR(150),
+    IN p_descripcion VARCHAR(250),
+    IN p_numero_serie VARCHAR(100),
+    IN p_id_marca INT,
+    IN p_stock INT
+)
+BEGIN
+    UPDATE stock_demo 
+    SET 
+        nombre_modelo = p_nombre_modelo,
+        descripcion = p_descripcion,
+        numero_serie = p_numero_serie, 
+        id_marca = p_id_marca,
+        stock = p_stock,
+        estatus = IF(p_stock > 0, 1, 2) -- Recalcula el estatus según el nuevo stock
+    WHERE id = p_id;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_eliminar_demo(
+    IN p_id INT
+)
+BEGIN
+    UPDATE stock_demo 
+    SET estatus = 0
+    WHERE id = p_id;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_activar_demo(
+    IN p_id INT
+)
+BEGIN
+    -- Al reactivar, evalúa si tiene stock para ponerlo en 1 o en 2
+    UPDATE stock_demo 
+    SET estatus = IF(stock > 0, 1, 2)
+    WHERE id = p_id;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_crear_visita_demo(
+    IN p_fecha_visita DATE,
+    IN p_id_tecnico INT,
+    IN p_id_asesor INT,
+    IN p_id_cliente INT,
+    IN p_empresa_no_registrada VARCHAR(150),
+    IN p_json_demos JSON -- Recibe un arreglo: [{"id_demo": 1, "cantidad": 2}]
+)
+BEGIN
+    DECLARE v_id_visita INT;
+    DECLARE i INT DEFAULT 0;
+    DECLARE json_len INT;
+    DECLARE v_id_demo INT;
+    DECLARE v_cantidad INT;
+
+    -- 1. Insertar la visita general (Inicia en estatus 1 = Programada)
+    INSERT INTO visitas_demostracion (
+        fecha_visita, 
+        id_tecnico, 
+        id_asesor, 
+        id_cliente, 
+        empresa_no_registrada, 
+        resumen_actividades, 
+        estatus
+    ) 
+    VALUES (
+        p_fecha_visita, 
+        p_id_tecnico, 
+        p_id_asesor, 
+        p_id_cliente, 
+        p_empresa_no_registrada, 
+        NULL, -- El resumen se llena después
+        1
+    );
+
+    -- Obtener el ID de la visita recién creada
+    SET v_id_visita = LAST_INSERT_ID();
+
+    -- 2. Recorrer el JSON e insertar los detalles (Los demos)
+    IF p_json_demos IS NOT NULL THEN
+        SET json_len = JSON_LENGTH(p_json_demos);
+        WHILE i < json_len DO
+            SET v_id_demo = JSON_UNQUOTE(JSON_EXTRACT(p_json_demos, CONCAT('$[', i, '].id_demo')));
+            SET v_cantidad = JSON_UNQUOTE(JSON_EXTRACT(p_json_demos, CONCAT('$[', i, '].cantidad')));
+
+            INSERT INTO detalle_visita_demos (id_visita, id_demo, cantidad, estatus_retorno)
+            VALUES (v_id_visita, v_id_demo, v_cantidad, 'En demostración');
+
+            SET i = i + 1;
+        END WHILE;
+    END IF;
+
+    -- Devolvemos el ID por si Angular lo necesita para redirigir
+    SELECT v_id_visita AS id_visita, 'Visita programada exitosamente' AS mensaje;
+END $$
+
+DELIMITER ;
+sp_completar_visita_demo
+
+DELIMITER $$
+CREATE PROCEDURE sp_cancelar_visita_demo(
+    IN p_id_visita INT
+)
+BEGIN
+    UPDATE visitas_demostracion 
+    SET estatus = 0
+    WHERE id = p_id_visita;
+    
+    SELECT 'Visita cancelada' AS mensaje;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_buscar_visitas_demo(
+    IN p_busqueda VARCHAR(150),
+    IN p_estatus TINYINT,
+    IN p_id_tecnico INT,
+    IN p_limite INT,
+    IN p_offset INT
+)
+BEGIN
+    -- 1. Traer los registros paginados
+    SELECT * FROM verVisitasDemostracion
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR empresa_destino LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_id_tecnico IS NULL OR id_tecnico = p_id_tecnico)
+    ORDER BY fecha_visita DESC, id_visita DESC
+    LIMIT p_limite OFFSET p_offset;
+
+    -- 2. Traer el conteo total para la paginación en Angular
+    SELECT COUNT(*) as total
+    FROM verVisitasDemostracion
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR empresa_destino LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_id_tecnico IS NULL OR id_tecnico = p_id_tecnico);
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_completar_visita_demo(
+    IN p_id_visita INT,
+    IN p_resumen_actividades TEXT,
+    IN p_json_retornos JSON -- Ej: [{"id_detalle": 1, "estatus_retorno": "Regresó a oficina"}]
+)
+sp_main: BEGIN
+    DECLARE i INT DEFAULT 0;
+    DECLARE json_len INT;
+    DECLARE v_id_detalle INT;
+    DECLARE v_estatus_retorno VARCHAR(50);
+    
+    -- Variables para manejar el inventario y el historial
+    DECLARE v_id_demo INT;
+    DECLARE v_cantidad INT;
+    DECLARE v_id_tecnico INT;
+    DECLARE v_id_cliente INT;
+    DECLARE v_empresa_no_registrada VARCHAR(150);
+
+    -- Manejador de errores para evitar que se guarden datos a medias
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 @sqlstate = RETURNED_SQLSTATE, @errno = MYSQL_ERRNO, @text = MESSAGE_TEXT;
+        ROLLBACK;
+        SELECT CONCAT('Error BD (', @errno, '): ', @text) AS mensaje;
+    END;
+
+    START TRANSACTION;
+
+    -- 1. Obtenemos los datos de la visita para poder registrar el movimiento del historial
+    SELECT id_tecnico, id_cliente, empresa_no_registrada 
+    INTO v_id_tecnico, v_id_cliente, v_empresa_no_registrada
+    FROM visitas_demostracion WHERE id = p_id_visita LIMIT 1;
+
+    -- 2. Actualizar la visita a Completada (2) y guardar el reporte
+    UPDATE visitas_demostracion 
+    SET 
+        resumen_actividades = p_resumen_actividades,
+        estatus = 2 
+    WHERE id = p_id_visita;
+
+    -- 3. Recorrer el JSON para actualizar el destino y el inventario de cada equipo
+    IF p_json_retornos IS NOT NULL THEN
+        SET json_len = JSON_LENGTH(p_json_retornos);
+       WHILE i < json_len DO
+        
+            -- Extraemos el ID, el estatus final Y LA CANTIDAD ESPECÍFICA
+            SET v_id_detalle = JSON_UNQUOTE(JSON_EXTRACT(p_json_retornos, CONCAT('$[', i, '].id_detalle')));
+            SET v_estatus_retorno = JSON_UNQUOTE(JSON_EXTRACT(p_json_retornos, CONCAT('$[', i, '].estatus_retorno')));
+            SET v_cantidad = JSON_UNQUOTE(JSON_EXTRACT(p_json_retornos, CONCAT('$[', i, '].cantidad')));
+
+            -- Identificamos qué demo es
+            SELECT id_demo INTO v_id_demo FROM detalle_visita_demos WHERE id = v_id_detalle;
+
+            -- Si el JSON no mandó una cantidad, asumimos que se le aplica al total de piezas de esa fila
+            IF v_cantidad IS NULL OR v_cantidad = 'null' THEN
+                SELECT cantidad INTO v_cantidad FROM detalle_visita_demos WHERE id = v_id_detalle;
+            END IF;
+
+            -- Actualizamos el estatus del detalle (Si hay varios, se quedará con el último leído, lo cual es aceptable para la tabla relacional)
+            UPDATE detalle_visita_demos 
+            SET estatus_retorno = v_estatus_retorno
+            WHERE id = v_id_detalle AND id_visita = p_id_visita;
+
+            -- =============================================================
+            -- LÓGICA DE INVENTARIO USANDO LA CANTIDAD PARCIAL (v_cantidad)
+            -- =============================================================
+            CASE v_estatus_retorno
+            
+                WHEN 'Regresó a oficina' THEN
+                    -- A) Regresamos SOLO la cantidad parcial al stock
+                    UPDATE stock_demo 
+                    SET stock = stock + v_cantidad, estatus = 1 
+                    WHERE id = v_id_demo;
+                    
+                    -- B) Registramos el movimiento por la cantidad exacta
+                    INSERT INTO movimientos (
+                        id_producto, id_demo, id_asesor, id_cliente, empresa_no_registrada, 
+                        tipo_movimiento, fecha, cantidad, destino
+                    ) VALUES (
+                        NULL, v_id_demo, v_id_tecnico, v_id_cliente, v_empresa_no_registrada, 
+                        'Entrada', NOW(), v_cantidad, 'Almacen'
+                    );
+                    
+                WHEN 'Cliente lo compró' THEN
+                    -- Para que el equipo no quede bloqueado del todo si fue parcial,
+                    -- solo lo marcamos inactivo SI su stock llega a 0.
+                    UPDATE stock_demo SET estatus = IF(stock > 0, estatus, 0) WHERE id = v_id_demo;
+                    
+                WHEN 'Dañado / En reparación' THEN
+                    -- Misma lógica, no bloqueamos todo el modelo si aún hay stock sano
+                    UPDATE stock_demo SET estatus = IF(stock > 0, estatus, 0) WHERE id = v_id_demo;
+                    
+                WHEN 'Se quedó a prueba' THEN
+                    -- Se mantiene en estatus 2
+                    UPDATE stock_demo SET estatus = 2 WHERE id = v_id_demo;
+                    
+                ELSE
+                    BEGIN END; 
+            END CASE;
+
+            SET i = i + 1;
+        END WHILE;
+    END IF;
+    
+    COMMIT;
+    
+    SELECT 'Éxito: Visita completada, inventarios y movimientos actualizados correctamente' AS mensaje;
+    
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_crear_solicitud_vale_demo(
+    IN p_id_asesor INT,
+    IN p_id_cliente INT,           
+    IN p_empresa_no_registrada VARCHAR(150), -- <-- NUEVO PARÁMETRO
+    IN p_id_visita INT,            
+    IN p_demos_json JSON           
+)
+BEGIN
+    DECLARE v_id_vale INT;
+    DECLARE v_anio_actual INT;
+    DECLARE v_nuevo_consecutivo INT;
+    DECLARE v_folio_visual VARCHAR(20);
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo crear la solicitud del vale para demostración' AS mensaje;
+    END;
+
+    START TRANSACTION;
+    
+    SET v_anio_actual = YEAR(NOW());
+    
+    SELECT COALESCE(MAX(consecutivo_anual), 0) + 1 
+    INTO v_nuevo_consecutivo 
+    FROM vales_salida 
+    WHERE YEAR(fecha) = v_anio_actual;
+
+    -- Insertamos guardando el ID del cliente (si existe) o el nombre en texto
+    INSERT INTO vales_salida (
+        consecutivo_anual, id_asesor, id_cliente, empresa_no_registrada, id_pedido, id_visita, tipo_vale, fecha, alerta_enviada, estatus
+    )
+    VALUES (
+        v_nuevo_consecutivo, p_id_asesor, p_id_cliente, p_empresa_no_registrada, NULL, p_id_visita, 'Demostracion', NOW(), 0, 0
+    );
+    
+    SET v_id_vale = LAST_INSERT_ID();
+
+    SET v_folio_visual = CONCAT('S-', v_anio_actual, '-', IF(v_nuevo_consecutivo < 10000, LPAD(v_nuevo_consecutivo, 4, '0'), v_nuevo_consecutivo));
+
+    INSERT INTO detalles_vale (id_vale, id_producto, id_demo, piezas)
+    SELECT v_id_vale, NULL, id_demo, piezas
+    FROM JSON_TABLE(
+        p_demos_json,
+        '$[*]' COLUMNS (
+            id_demo INT PATH '$.id_demo',
+            piezas INT PATH '$.piezas'
+        )
+    ) AS tabla_json;
+    
+    INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida)
+    SELECT 
+        NOW(), 
+        'Nueva Solicitud Demo', 
+        id, 
+        CONCAT('Soporte Técnico ha solicitado el Vale ', v_folio_visual, ' para una Demostración. Requiere autorización.'), 
+        0
+    FROM asesores 
+    WHERE Rol IN ('Administrador', 'Almacen');
+    
+    COMMIT;
+    
+    SELECT 'Éxito: Solicitud de demostración creada correctamente' AS mensaje, v_id_vale AS id_nuevo_vale, v_folio_visual AS folio_generado;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_autorizar_vale_demo(
+    IN p_id_vale INT,
+    IN p_comentario VARCHAR(255)
+)
+sp_main: BEGIN
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_id_demo INT;
+    DECLARE v_piezas INT;
+    DECLARE v_id_asesor INT;
+    DECLARE v_id_cliente INT;
+    DECLARE v_empresa_no_registrada VARCHAR(150); 
+    DECLARE v_estatus_actual INT;
+    DECLARE v_stock_actual INT; 
+    DECLARE v_nombre_demo VARCHAR(150); 
+    
+    DECLARE cur_detalles CURSOR FOR 
+        SELECT id_demo, piezas FROM detalles_vale WHERE id_vale = p_id_vale;
+        
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+
+    -- MANEJADOR DE ERRORES MEJORADO
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        -- Esto capturará el error real de MySQL si algo falla
+        GET DIAGNOSTICS CONDITION 1 @sqlstate = RETURNED_SQLSTATE, @errno = MYSQL_ERRNO, @text = MESSAGE_TEXT;
+        ROLLBACK;
+        SELECT CONCAT('Error BD (', @errno, '): ', @text) AS mensaje;
+    END;
+
+    START TRANSACTION;
+    
+    -- Consultamos estatus, asesor, cliente Y el nombre de la empresa sin registro
+    SELECT Estatus, id_asesor, id_cliente, empresa_no_registrada 
+    INTO v_estatus_actual, v_id_asesor, v_id_cliente, v_empresa_no_registrada 
+    FROM vales_salida WHERE id = p_id_vale LIMIT 1;
+    
+    IF v_estatus_actual = 0 THEN 
+
+        UPDATE vales_salida 
+        SET estatus = 1, comentario = p_comentario
+        WHERE id = p_id_vale;
+
+        OPEN cur_detalles;
+        read_loop: LOOP
+            FETCH cur_detalles INTO v_id_demo, v_piezas;
+            
+            IF v_done THEN
+                LEAVE read_loop;
+            END IF;
+
+            -- Validamos si el producto demo existe
+            IF v_id_demo IS NOT NULL THEN
+            
+                -- 1. Consultamos el stock actual del equipo demo
+                SELECT IFNULL(stock, 0), nombre_modelo INTO v_stock_actual, v_nombre_demo 
+                FROM stock_demo WHERE id = v_id_demo FOR UPDATE;
+
+                -- 2. Validamos que haya stock suficiente para prestar
+                IF v_piezas > v_stock_actual THEN
+                    ROLLBACK; 
+                    CLOSE cur_detalles; 
+                    SELECT CONCAT('Error: Stock insuficiente. El equipo demo "', v_nombre_demo, '" solo tiene ', v_stock_actual, ' piezas disponibles.') AS mensaje;
+                    LEAVE sp_main; 
+                END IF;
+                
+                -- 3. Registramos el movimiento INCLUYENDO empresa_no_registrada
+                INSERT INTO movimientos (
+                    id_producto, id_demo, id_asesor, id_cliente, empresa_no_registrada, 
+                    tipo_movimiento, fecha, cantidad, destino
+                )
+                VALUES (
+                    NULL, v_id_demo, v_id_asesor, v_id_cliente, v_empresa_no_registrada, 
+                    'Salida', NOW(), v_piezas, 'Demostracion'
+                );
+
+                -- 4. Descontamos el stock y ajustamos el estatus
+                UPDATE stock_demo 
+                SET 
+                    stock = stock - v_piezas,
+                    estatus = IF((stock - v_piezas) > 0, 1, 2)
+                WHERE id = v_id_demo;
+                
+            END IF;
+
+        END LOOP;
+        CLOSE cur_detalles;
+        
+        -- CORRECCIÓN: Se cambió el 0 por v_id_asesor
+        INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida)
+        VALUES (NOW(), 'Vale Aceptado', v_id_asesor, 'Tu vale de salida para demostración ha sido autorizado y los equipos descontados.', 0);
+        
+        COMMIT;
+        
+        SELECT 'Éxito: Vale de demostración autorizado, equipos descontados e historial actualizado' AS mensaje;
+
+    ELSE
+        ROLLBACK;
+        SELECT 'Error: Este vale ya fue procesado anteriormente' AS mensaje;
+        
+    END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_buscar_demos(
+    IN p_busqueda VARCHAR(100),
+    IN p_estatus TINYINT,
+    IN p_marca INT,
+    IN p_limite INT,
+    IN p_offset INT
+)
+BEGIN
+    -- 1er SELECT: Trae los registros para la tabla (con Límite y Offset)
+    SELECT * FROM verStockDemos
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR nombre_modelo LIKE CONCAT('%', p_busqueda, '%') 
+         OR numero_serie LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_marca IS NULL OR p_marca = 0 OR id_marca = p_marca)
+    ORDER BY id_demo DESC
+    LIMIT p_limite OFFSET p_offset;
+
+    -- 2do SELECT: Trae el total real de filas encontradas (Sin límite)
+    SELECT COUNT(*) as total
+    FROM verStockDemos
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR nombre_modelo LIKE CONCAT('%', p_busqueda, '%') 
+         OR numero_serie LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_marca IS NULL OR p_marca = 0 OR id_marca = p_marca);
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_buscar_demo_para_visita(
+    IN p_busqueda VARCHAR(300),
+    IN p_id_marca INT -- Opcional, por si en el futuro quieres filtrar el buscador por marca
+)
+BEGIN
+    SELECT 
+        sd.id AS id_demo, 
+        sd.nombre_modelo, 
+        sd.descripcion, 
+        sd.numero_serie, 
+        sd.stock, 
+        sd.estatus,
+        sd.id_marca,
+        mp.Nombre AS nombre_marca -- <-- AQUÍ EXTRAEMOS EL NOMBRE DE LA MARCA
+    FROM stock_demo sd
+    -- Agregamos la unión con la tabla de marcas
+    LEFT JOIN marca_proveedor mp ON sd.id_marca = mp.id
+    WHERE (
+           sd.nombre_modelo LIKE CONCAT('%', p_busqueda, '%') 
+        OR sd.numero_serie LIKE CONCAT('%', p_busqueda, '%')
+        OR sd.descripcion LIKE CONCAT('%', p_busqueda, '%')
+    )
+      -- Solo traemos Demos Activos (1) o En Demostración (2)
+      AND sd.estatus IN (1, 2) 
+      AND (p_id_marca IS NULL OR sd.id_marca = p_id_marca) 
+
+    ORDER BY 
+        CASE 
+            -- 1. Coincidencia exacta (Prioridad máxima)
+            WHEN sd.nombre_modelo = p_busqueda OR sd.numero_serie = p_busqueda THEN 1
+            -- 2. Empieza exactamente con lo que el usuario escribe
+            WHEN sd.nombre_modelo LIKE CONCAT(p_busqueda, '%') THEN 2
+            WHEN sd.numero_serie LIKE CONCAT(p_busqueda, '%') THEN 3
+            WHEN sd.descripcion LIKE CONCAT(p_busqueda, '%') THEN 4
+            -- 3. La palabra está dentro del texto, después de un espacio
+            WHEN sd.nombre_modelo LIKE CONCAT('% ', p_busqueda, '%') OR sd.descripcion LIKE CONCAT('% ', p_busqueda, '%') THEN 5 
+            -- 4. Cualquier otra coincidencia parcial
+            ELSE 6 
+        END ASC,
+        LENGTH(sd.nombre_modelo) ASC, 
+        sd.nombre_modelo ASC
+
+    LIMIT 15;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_pedidos_disponibles_para_vale(
+    IN p_id_asesor INT,
+    IN p_rol VARCHAR(50)
+)
+BEGIN
+    SELECT 
+        p.id,
+        p.id_cliente,
+        c.Nombre AS nombre_cliente,
+        p.orden_compra,
+        p.fecha,
+        p.id_cotizacion
+    FROM pedidos p
+    INNER JOIN clientes c ON c.id = p.id_cliente
+    WHERE (p.id_asesor = p_id_asesor OR p_rol = 'Administrador' OR p_rol = 'Almacen')
+      AND p.Estatus = 2  -- (Asumiendo que 2 es el estatus de pedido listo/aprobado)
+      
+      -- EL FILTRO QUE EVITA DUPLICADOS
+      AND NOT EXISTS (
+          SELECT 1 FROM vales_salida v 
+          WHERE v.id_pedido = p.id 
+            AND v.estatus IN (0, 1) -- Bloquea si hay vale Pendiente(0) o Aceptado(1)
+      )
+    ORDER BY p.fecha DESC;
+END $$
+
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_visitas_disponibles_para_vale(
+    IN p_id_tecnico INT
+)
+BEGIN
+    SELECT 
+        v.id AS id_visita,
+        v.fecha_visita,
+        v.id_cliente,
+        v.empresa_no_registrada,
+        COALESCE(c.Nombre, v.empresa_no_registrada) AS empresa_destino
+    FROM visitas_demostracion v
+    LEFT JOIN clientes c ON v.id_cliente = c.id
+    WHERE v.id_tecnico = p_id_tecnico
+      AND v.estatus = 1 -- 1 = Visita Programada/Activa
+      
+      -- EL FILTRO QUE EVITA DUPLICADOS
+      AND NOT EXISTS (
+          SELECT 1 FROM vales_salida vs 
+          WHERE vs.id_visita = v.id 
+            AND vs.estatus IN (0, 1)
+      )
+    ORDER BY v.fecha_visita ASC;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_registrar_entrada_demo(
+    IN p_codigo VARCHAR(150),
+    IN p_cantidad INT,
+    IN p_id_asesor INT
+)
+BEGIN
+    DECLARE v_id_demo INT;
+    DECLARE v_estatus_actual TINYINT;
+    
+    -- Manejador de errores para revertir cambios si algo falla
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo registrar el movimiento del equipo demo' AS mensaje;
+    END;
+
+    -- Buscar el equipo demo por número de serie o nombre de modelo
+    SELECT id, estatus 
+    INTO v_id_demo, v_estatus_actual
+    FROM stock_demo
+    WHERE numero_serie = p_codigo OR nombre_modelo = p_codigo
+    LIMIT 1;
+
+    IF v_id_demo IS NOT NULL THEN
+        START TRANSACTION;
+    
+        -- 1. Registrar el movimiento en el historial
+        -- Se deja id_producto en NULL y se asigna el v_id_demo. El destino siempre es 'Almacen'.
+        INSERT INTO movimientos (
+            id_producto, id_demo, id_asesor, 
+            tipo_movimiento, fecha, cantidad, destino
+        )
+        VALUES (
+            NULL, v_id_demo, p_id_asesor, 
+            'Entrada', NOW(), p_cantidad, 'Almacen'
+        );
+        
+        -- 2. Sumar el stock y actualizar el estatus
+        -- Si llega stock nuevo a la oficina, el estatus pasa a 1 (Disponible/Activo)
+        UPDATE stock_demo 
+        SET 
+            stock = IFNULL(stock, 0) + p_cantidad,
+            estatus = 1
+        WHERE id = v_id_demo;
+        
+        COMMIT;
+        SELECT 'Éxito: Entrada de demo registrada y existencias actualizadas' AS mensaje;
+    ELSE
+        SELECT 'Error: No se encontró ningún equipo demo con ese número de serie o modelo' AS mensaje;
+    END IF;
+
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_buscar_proyectos_soporte(
+    IN p_busqueda VARCHAR(150),
+    IN p_estatus TINYINT,
+    IN p_id_tecnico INT,
+    IN p_rol VARCHAR(50),
+    IN p_limite INT,
+    IN p_offset INT
+)
+BEGIN
+    -- 1. Traer los registros paginados
+    SELECT * FROM verProyectosSoporte
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR nombre_proyecto LIKE CONCAT('%', p_busqueda, '%')
+         OR empresa_destino LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_rol = 'Administrador' OR id_tecnico = p_id_tecnico)
+    ORDER BY fecha_alta DESC
+    LIMIT p_limite OFFSET p_offset;
+
+    -- 2. Traer el conteo total para la paginación en Angular
+    SELECT COUNT(*) AS total FROM verProyectosSoporte
+    WHERE 
+        (p_busqueda IS NULL OR p_busqueda = '' 
+         OR nombre_proyecto LIKE CONCAT('%', p_busqueda, '%')
+         OR empresa_destino LIKE CONCAT('%', p_busqueda, '%'))
+        AND 
+        (p_estatus IS NULL OR p_estatus = -1 OR estatus = p_estatus)
+        AND 
+        (p_rol = 'Administrador' OR id_tecnico = p_id_tecnico);
+END $$
+
+DELIMITER ;
+
+
+DELIMITER $$
+CREATE PROCEDURE sp_registrar_avance_proyecto(
+    IN p_id_proyecto INT,
+    IN p_comentarios TEXT,
+    IN p_nuevo_estatus TINYINT,
+    IN p_se_cotizo TINYINT,
+    IN p_id_usuario INT,
+    IN p_tipo_evento VARCHAR(30)
+)
+BEGIN
+    DECLARE v_estatus_anterior TINYINT;
+    DECLARE v_se_cotizo_actual TINYINT;
+    DECLARE v_se_cotizo_final TINYINT;
+ 
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo registrar el avance' AS mensaje;
+    END;
+ 
+    START TRANSACTION;
+ 
+    -- Estado actual del proyecto ANTES de aplicar el cambio
+    SELECT estatus, se_cotizo
+        INTO v_estatus_anterior, v_se_cotizo_actual
+        FROM proyectos_soporte
+        WHERE id = p_id_proyecto
+        FOR UPDATE;
+ 
+    -- se_cotizo nunca retrocede de 1 a 0
+    SET v_se_cotizo_final = GREATEST(IFNULL(v_se_cotizo_actual, 0), IFNULL(p_se_cotizo, 0));
+ 
+    INSERT INTO bitacora_avances
+        (id_proyecto, fecha_registro, estatus_anterior, estatus_nuevo, id_usuario, tipo_evento, comentarios)
+    VALUES
+        (p_id_proyecto, NOW(), v_estatus_anterior, p_nuevo_estatus, p_id_usuario, p_tipo_evento, p_comentarios);
+ 
+    IF p_nuevo_estatus IS NOT NULL THEN
+        IF p_nuevo_estatus = 6 THEN
+            UPDATE proyectos_soporte
+                SET estatus = p_nuevo_estatus, se_cotizo = v_se_cotizo_final, fecha_termino = NOW()
+                WHERE id = p_id_proyecto;
+        ELSE
+            UPDATE proyectos_soporte
+                SET estatus = p_nuevo_estatus, se_cotizo = v_se_cotizo_final
+                WHERE id = p_id_proyecto;
+        END IF;
+    END IF;
+ 
+    COMMIT;
+    SELECT 'Avance registrado correctamente' AS mensaje;
+END $$
+DELIMITER ;
+
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_contar_proyectos_mes(
+    IN p_id_tecnico INT,
+    IN p_rol VARCHAR(50)
+)
+BEGIN
+    SELECT COUNT(*) AS total_mes
+    FROM proyectos_soporte
+    WHERE MONTH(fecha_alta) = MONTH(CURRENT_DATE())
+      AND YEAR(fecha_alta) = YEAR(CURRENT_DATE())
+      AND (p_rol = 'Administrador' OR id_tecnico = p_id_tecnico)
+      -- Opcional: Si solo quieres contar los que no estén cancelados, descomenta la siguiente línea:
+      -- AND estatus != 0
+      ;
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_modificar_proyecto_soporte(
+    IN p_id_proyecto INT,
+    IN p_nombre_proyecto VARCHAR(150),
+    IN p_descripcion TEXT,
+    IN p_id_tecnico INT, 
+    IN p_id_cliente INT,
+    IN p_empresa_no_registrada VARCHAR(150),
+    IN p_json_materiales JSON
+)
+BEGIN
+    DECLARE i INT DEFAULT 0;
+    DECLARE json_len INT;
+    
+    -- ¡EL CAMBIO CLAVE! Lo declaramos como VARCHAR para que no choque con la palabra "null"
+    DECLARE v_id_producto VARCHAR(50); 
+    DECLARE v_cantidad INT;
+    DECLARE v_nombre_modelo VARCHAR(150);
+    DECLARE v_marca VARCHAR(100);
+    DECLARE v_codigo VARCHAR(200);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo modificar el proyecto' AS mensaje;
+    END;
+
+    START TRANSACTION;
+
+    UPDATE proyectos_soporte 
+    SET nombre_proyecto = p_nombre_proyecto,
+        descripcion = p_descripcion,
+        id_tecnico = p_id_tecnico, 
+        id_cliente = p_id_cliente,
+        empresa_no_registrada = p_empresa_no_registrada
+    WHERE id = p_id_proyecto;
+
+    IF p_json_materiales IS NOT NULL THEN
+        DELETE FROM materiales_proyecto WHERE id_proyecto = p_id_proyecto;
+        
+        SET json_len = JSON_LENGTH(p_json_materiales);
+        
+        WHILE i < json_len DO
+            SET v_id_producto = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].id_producto')));
+            SET v_cantidad = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].cantidad')));
+            SET v_nombre_modelo = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].nombre_modelo')));
+            SET v_marca = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].marca')));
+            SET v_codigo = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].codigo'))); 
+
+            -- Aquí convertimos el texto "null" en un nulo real de base de datos
+            IF v_id_producto = 'null' OR v_id_producto = '' THEN SET v_id_producto = NULL; END IF;
+
+            IF v_cantidad > 0 AND (v_id_producto IS NOT NULL OR v_nombre_modelo IS NOT NULL) THEN
+                INSERT INTO materiales_proyecto (id_proyecto, id_producto, nombre_modelo, marca, codigo, cantidad)
+                VALUES (p_id_proyecto, v_id_producto, v_nombre_modelo, v_marca, v_codigo, v_cantidad);
+            END IF;
+
+            SET i = i + 1;
+        END WHILE;
+    END IF;
+
+    COMMIT;
+    SELECT 'Proyecto modificado exitosamente' AS mensaje;
+END $$
+
+DELIMITER ;
+DELIMITER $$
+CREATE PROCEDURE sp_alta_proyecto_soporte(
+    IN p_nombre_proyecto VARCHAR(150),
+    IN p_descripcion TEXT,
+    IN p_id_tecnico INT,
+    IN p_id_cliente INT,
+    IN p_empresa_no_registrada VARCHAR(150),
+    IN p_json_materiales JSON 
+)
+BEGIN
+    DECLARE v_id_proyecto INT;
+    DECLARE i INT DEFAULT 0;
+    DECLARE json_len INT;
+    
+    -- ¡EL CAMBIO CLAVE!
+    DECLARE v_id_producto VARCHAR(50); 
+    DECLARE v_cantidad INT;
+    DECLARE v_nombre_modelo VARCHAR(150);
+    DECLARE v_marca VARCHAR(100);
+    DECLARE v_codigo VARCHAR(200);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo registrar el proyecto' AS mensaje;
+    END;
+
+    START TRANSACTION;
+
+    INSERT INTO proyectos_soporte (
+        nombre_proyecto, descripcion, id_tecnico, id_cliente, 
+        empresa_no_registrada, fecha_alta, estatus
+    ) VALUES (
+        p_nombre_proyecto, p_descripcion, p_id_tecnico, p_id_cliente, 
+        p_empresa_no_registrada, NOW(), 1
+    );
+
+    SET v_id_proyecto = LAST_INSERT_ID();
+
+    IF p_json_materiales IS NOT NULL THEN
+        SET json_len = JSON_LENGTH(p_json_materiales);
+        
+        WHILE i < json_len DO
+            SET v_id_producto = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].id_producto')));
+            SET v_cantidad = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].cantidad')));
+            SET v_nombre_modelo = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].nombre_modelo')));
+            SET v_marca = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].marca')));
+            SET v_codigo = JSON_UNQUOTE(JSON_EXTRACT(p_json_materiales, CONCAT('$[', i, '].codigo')));
+
+            IF v_id_producto = 'null' OR v_id_producto = '' THEN SET v_id_producto = NULL; END IF;
+
+            IF v_cantidad > 0 AND (v_id_producto IS NOT NULL OR v_nombre_modelo IS NOT NULL) THEN
+                INSERT INTO materiales_proyecto (id_proyecto, id_producto, nombre_modelo, marca, codigo, cantidad)
+                VALUES (v_id_proyecto, v_id_producto, v_nombre_modelo, v_marca, v_codigo, v_cantidad);
+            END IF;
+
+            SET i = i + 1;
+        END WHILE;
+    END IF;
+
+    COMMIT;
+    SELECT 'Proyecto registrado exitosamente' AS mensaje;
+END $$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE sp_finalizar_proyecto_soporte(
+    IN p_id_proyecto INT
+)
+BEGIN
+    DECLARE v_estatus_anterior TINYINT;
+ 
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'Error: No se pudo finalizar el proyecto' AS mensaje;
+    END;
+ 
+    START TRANSACTION;
+ 
+    SELECT estatus INTO v_estatus_anterior
+        FROM proyectos_soporte
+        WHERE id = p_id_proyecto
+        FOR UPDATE;
+ 
+    UPDATE proyectos_soporte
+        SET estatus = 0, fecha_termino = NOW()
+        WHERE id = p_id_proyecto;
+ 
+    INSERT INTO bitacora_avances
+        (id_proyecto, fecha_registro, estatus_anterior, estatus_nuevo, id_usuario, tipo_evento, comentarios)
+    VALUES
+        (p_id_proyecto, NOW(), v_estatus_anterior, 0, NULL, 'sistema',
+         'El proyecto fue finalizado/cancelado manualmente desde los detalles del proyecto.');
+ 
+    COMMIT;
+    SELECT 'Proyecto finalizado exitosamente' AS mensaje;
+END $$
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_asignar_credito_cliente(
+    IN p_id_cliente INT,
+    IN p_tiene_credito TINYINT(1),
+    IN p_limite_credito DECIMAL(12,2),
+    OUT p_mensaje VARCHAR(255)
+)
+sp_main: BEGIN
+    DECLARE v_existe INT;
+    DECLARE v_limite_final DECIMAL(12,2);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_mensaje = 'Error interno: no se pudo actualizar la línea de crédito.';
+    END;
+
+    -- 1. VALIDAR QUE EL CLIENTE EXISTA
+    SELECT COUNT(*) INTO v_existe FROM clientes WHERE id = p_id_cliente;
+
+    IF v_existe = 0 THEN
+        SET p_mensaje = 'Error: El cliente especificado no existe.';
+        LEAVE sp_main;
+    END IF;
+
+    -- 2. VALIDACIONES DE NEGOCIO
+    IF p_tiene_credito IS NULL THEN
+        SET p_mensaje = 'Error: Debe indicar si el cliente tiene crédito autorizado (tiene_credito).';
+        LEAVE sp_main;
+    END IF;
+
+    IF p_tiene_credito NOT IN (0, 1) THEN
+        SET p_mensaje = 'Error: El valor de tiene_credito debe ser 0 o 1.';
+        LEAVE sp_main;
+    END IF;
+
+    IF p_tiene_credito = 1 AND (p_limite_credito IS NULL OR p_limite_credito <= 0) THEN
+        SET p_mensaje = 'Error: Debe capturar un límite de crédito mayor a $0 para autorizar crédito.';
+        LEAVE sp_main;
+    END IF;
+
+    IF p_limite_credito IS NOT NULL AND p_limite_credito < 0 THEN
+        SET p_mensaje = 'Error: El límite de crédito no puede ser negativo.';
+        LEAVE sp_main;
+    END IF;
+
+    -- 3. SI SE DESACTIVA EL CRÉDITO, EL LÍMITE/SALDO SE FUERZA A 0
+    -- (evita dejar un saldo "fantasma" disponible en un cliente sin crédito autorizado)
+    IF p_tiene_credito = 0 THEN
+        SET v_limite_final = 0;
+    ELSE
+        SET v_limite_final = p_limite_credito;
+    END IF;
+
+    -- 4. ACTUALIZAR
+    START TRANSACTION;
+
+    UPDATE clientes
+    SET tiene_credito = p_tiene_credito,
+        limite_credito = v_limite_final
+    WHERE id = p_id_cliente;
+
+    COMMIT;
+
+    -- 5. MENSAJE FINAL
+    IF p_tiene_credito = 1 THEN
+        SET p_mensaje = CONCAT('Línea de crédito autorizada correctamente. Límite: $', v_limite_final);
+    ELSE
+        SET p_mensaje = 'Línea de crédito desactivada para el cliente.';
+    END IF;
+
+END $$
+DELIMITER ;
+ 

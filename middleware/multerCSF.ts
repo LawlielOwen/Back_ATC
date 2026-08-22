@@ -4,14 +4,13 @@ import path from 'path';
 import fs from 'fs';
 import { Request } from 'express';
 
-// 1. Aseguramos que el directorio exista
 const recibosDir = path.join(process.cwd(), 'uploads/CSF');
 
 if (!fs.existsSync(recibosDir)) {
     fs.mkdirSync(recibosDir, { recursive: true });
 }
 
-// 2. Configuración de almacenamiento (Como ya lo tenías)
+// 2. Configuración de almacenamiento
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, recibosDir); 
@@ -19,14 +18,13 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
-        // Quitamos espacios del nombre original para mayor seguridad
         cb(null, 'CSF-' + uniqueSuffix + ext);
     }
 });
 
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'application/pdf') {
-        cb(null, true); // Archivo aceptado
+        cb(null, true); 
     } else {
         cb(new Error('FORMATO_INVALIDO: Solo se permiten archivos PDF reales.') as any, false);
     }

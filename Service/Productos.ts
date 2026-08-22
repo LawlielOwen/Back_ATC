@@ -3,40 +3,34 @@ import { Productos } from '../Model/Productos'
 
 export class ProductoService {
 static async agregarProducto(p: Productos) {
-        // 1. Agregamos ExtraDescripcion, Apartado y origen a la desestructuración
         const { 
             Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
-            Codigo_japon, Modelo, Estanteria, Caja, Stock, Apartado, origen, id_marca 
+            Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
         } = p;
 
-        // 2. Ahora son 13 signos de interrogación (?)
-        const [rows]: any = await pool.query('call sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        const [rows]: any = await pool.query('call sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?)', [
             Nombre, 
             Descripcion, 
             ExtraDescripcion || null, 
             Precio, 
             Codigo_numeral, 
             Codigo_japon, 
-            Modelo, 
             Estanteria, 
             Caja, 
             Stock || 0, 
             Apartado || 0, 
-            origen || null, 
             id_marca 
         ]);
         return rows;
     }
 
     static async modificarProducto(id: Number, p: Productos) {
-        // 1. Agregamos ExtraDescripcion, Apartado y origen a la desestructuración
         const { 
             Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
-            Codigo_japon, Modelo, Estanteria, Caja, Stock, Apartado, origen, id_marca 
+            Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
         } = p;
 
-        // 2. Ahora son 14 signos de interrogación (?) porque incluye el ID al principio
-        const [rows]: any = await pool.query('call sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        const [rows]: any = await pool.query('call sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?,?)', [
             id, 
             Nombre, 
             Descripcion, 
@@ -44,12 +38,10 @@ static async agregarProducto(p: Productos) {
             Precio, 
             Codigo_numeral, 
             Codigo_japon, 
-            Modelo, 
             Estanteria, 
             Caja, 
             Stock || 0, 
             Apartado || 0, 
-            origen || null, 
             id_marca
         ]);
         return rows;
@@ -104,9 +96,10 @@ static async agregarProducto(p: Productos) {
         const [rows]: any = await pool.query('SELECT COUNT(*) AS total_stock FROM verProductos WHERE Estatus = 1;');
         return rows[0];
     }
-    static async buscarProductoPorCodigo(codigo: string) {
-        const [rows]: any = await pool.query('CALL sp_buscar_producto_por_codigo(?)', [codigo]);
-        return rows[0].length > 0 ? rows[0][0] : null;
+  
+    static async buscarProductoPorCodigo(termino: string) {
+    const [rows]: any = await pool.query('CALL sp_buscar_producto_por_codigo(?)', [termino]);
+    return rows[0];
     }
    static async registrarEntradaProducto(codigo: string, cantidad: number, destino: string, id_asesor: number) {
         const [rows]: any = await pool.query('CALL sp_registrar_entrada_producto(?, ?, ?, ?)', [

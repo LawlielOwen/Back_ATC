@@ -24,14 +24,12 @@ export class NotificacionesJob {
                 for (const pedido of pedidos) {
                     const mensaje = `Un pedido de material del proveedor ${pedido.proveedor} está proximo a ejecutarse en 7 días.`;
                     
-                    // Notificar al Asesor que lo pidió
                     await pool.query(
                         `INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida) 
                          VALUES (NOW(), 'Llegada Próxima', ?, ?, 0)`,
                         [pedido.id_asesor, mensaje]
                     );
 
-                    // Notificar a Admin y Almacen
                     await pool.query(`
                         INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida)
                         SELECT NOW(), 'Llegada Próxima', id, ?, 0 
@@ -43,7 +41,6 @@ export class NotificacionesJob {
                         [pedido.id]
                     );
 
-                    // WebSockets
                     io.to(`usuario_${pedido.id_asesor}`)
                         .to('rol_Administrador')
                         .to('rol_Almacen')
@@ -63,14 +60,12 @@ export class NotificacionesJob {
             timezone: "America/Mexico_City"
         });
 
-        // =========================================================
         // 2. JOB: Adeudos de clientes (5 días de antelación)
-        // =========================================================
+     
         cron.schedule('0 9 * * *', async () => {
             console.log('Ejecutando revisión de adeudos de clientes (5 días)...');
 
             try {
-                // Buscamos pedidos en estatus Pendiente (1) que vencen en exactamente 5 días
                 const [pedidosAdeudo]: any = await pool.query(`
                     SELECT p.id, p.id_asesor, c.Nombre as nombre_cliente
                     FROM pedidos p
@@ -83,30 +78,25 @@ export class NotificacionesJob {
                 if (pedidosAdeudo.length === 0) return;
 
                 for (const pedido of pedidosAdeudo) {
-                    // Mensaje dinámico SIN el ID del pedido
                     const mensaje = `El cliente ${pedido.nombre_cliente} tiene una fecha límite de pago en 5 días y aún no presenta comprobante de pago.`;
                    
-                    // A) Notificar al Asesor encargado de ese cliente
                     await pool.query(
                         `INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida) 
                          VALUES (NOW(), 'Alerta de Adeudo', ?, ?, 0)`,
                         [pedido.id_asesor, mensaje]
                     );
 
-                    // B) Notificar al Administrador y al Cotizador
                     await pool.query(`
                         INSERT INTO notificaciones (fecha, tipo_notificacion, id_asesor, mensaje, leida)
                         SELECT NOW(), 'Alerta de Adeudo', id, ?, 0 
                         FROM Asesores WHERE Rol IN ('Administrador', 'Cotizador')
                     `, [mensaje]);
 
-                    // C) Marcamos que la alerta ya se envió para no repetir mañana
                     await pool.query(
                         `UPDATE pedidos SET alerta_enviada = 1 WHERE id = ?`,
                         [pedido.id]
                     );
 
-                    // D) WebSockets en tiempo real
                     io.to(`usuario_${pedido.id_asesor}`)
                         .to('rol_Administrador')
                         .to('rol_Cotizador')

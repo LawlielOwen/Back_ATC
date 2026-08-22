@@ -1,4 +1,4 @@
-import pool from '../Config/db'; // Asegúrate de que este sea tu pool de conexiones (ej. mysql2/promise)
+import pool from '../Config/db'; 
 
 export class TicketService {
     

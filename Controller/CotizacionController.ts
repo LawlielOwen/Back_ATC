@@ -121,7 +121,6 @@ static async buscaryfiltrar(req: Request, res: Response) {
             const busqueda = (req.query.busqueda as string) || ''; 
             const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : -1;        
             
-            // Retomamos fechaInicio y fechaFin
             const fechaInicio = (req.query.fechaInicio as string) || null;
             const fechaFin = (req.query.fechaFin as string) || null;
             
@@ -164,7 +163,6 @@ static async buscaryfiltrar(req: Request, res: Response) {
     }
    static async descargarPDF(req: Request, res: Response) {
     try {
-        // Tomamos el ID directo de los parámetros y usamos 'any' para evitar conflictos de TypeScript
         const idCotizacion: any = req.params.id;
         
         const pdfBuffer = await CotizacionService.generarPDFCotizacion(idCotizacion);
@@ -173,7 +171,6 @@ static async buscaryfiltrar(req: Request, res: Response) {
         res.setHeader('Content-Disposition', `attachment; filename="Cotizacion_${idCotizacion}.pdf"`);
         res.setHeader('Content-Length', pdfBuffer.length);
 
-        // Enviamos el buffer binario
         res.end(pdfBuffer);
     } catch (error: any) {
         console.error('Error generando PDF:', error);

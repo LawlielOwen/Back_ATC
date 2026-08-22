@@ -4,3 +4,14 @@ pdfHelper.js
 .gitignore
 pdfHelper.ts
 .cache/
+uploads/CSF/*.pdf
+uploads/recibos/*.pdf
+
+uploads/CSF/*
+uploads/recibos/*
+
+uploads/CSF/*
+!uploads/CSF/.gitkeep
+
+uploads/recibos/*
+!uploads/recibos/.gitkeep

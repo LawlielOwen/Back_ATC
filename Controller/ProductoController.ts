@@ -96,19 +96,19 @@ export class ProductoController {
         }
     }
     static async buscarProductoPorCodigo(req: Request, res: Response) {
-        try {
-            const codigo = req.params.codigo as string;
-            const result = await ProductoService.buscarProductoPorCodigo(codigo);
-        
-            if (result) {
-                res.status(200).json(result);
-            } else {
-                res.status(404).json({ error: 'Producto no encontrado con el código proporcionado' });
-            }
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+      try {
+        const termino = (req.query.termino as string || '').trim();
+
+        if (termino.length < 2) {
+            return res.status(200).json([]);
         }
+
+        const result = await ProductoService.buscarProductoPorCodigo(termino);
+        res.status(200).json(result);
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
     }
 static async registrarEntradaProducto(req: Request, res: Response) {
         try {

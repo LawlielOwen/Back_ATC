@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import { PedidoService } from "../Service/Pedidos"; // Asegúrate de que la ruta sea correcta
-import fs from 'fs'; // Asegúrate de importar fs
+import { PedidoService } from "../Service/Pedidos";
+import fs from 'fs';
 import path from 'path'; 
 export class PedidoController {
 
-    // 1. Buscar, Filtrar y Paginar
 static async buscarYFiltrar(req: Request, res: Response) {
     try {
         const busqueda = (req.query.busqueda as string) || '';
@@ -13,7 +12,6 @@ static async buscarYFiltrar(req: Request, res: Response) {
         const fechaInicio = (req.query.fechaInicio as string) || null;
         const fechaFin = (req.query.fechaFin as string) || null;
         
-        // NUEVO: si no viene, se manda null y el SP no filtra
         const idAsesor = req.query.id_asesor ? parseInt(req.query.id_asesor as string) : null;
         
         const pagina = parseInt(req.query.pagina as string) || 1;
@@ -36,7 +34,6 @@ static async buscarYFiltrar(req: Request, res: Response) {
     }
 }
 
-    // 2. Obtener Detalles del Pedido
     static async obtenerDetalles(req: Request, res: Response) {
         try {
             const id_pedido = parseInt(req.params.id as string);
@@ -77,7 +74,7 @@ static async subirFactura(req: Request, res: Response) {
                 const rutaAbsolutaAnterior = path.join(process.cwd(), ruta_anterior);
                 
                 if (fs.existsSync(rutaAbsolutaAnterior)) {
-                    fs.unlinkSync(rutaAbsolutaAnterior); // Esto lo elimina físicamente
+                    fs.unlinkSync(rutaAbsolutaAnterior);
                 }
             }
 
@@ -86,7 +83,6 @@ static async subirFactura(req: Request, res: Response) {
         } catch (error: any) {
             console.error('Error en subirFactura:', error);
 
-            // Si hay error, borramos el que se acaba de subir (SÍ lleva req.file.path)
             if (req.file && fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }
@@ -142,7 +138,6 @@ static async subirFactura(req: Request, res: Response) {
         } catch (error: any) {
             console.error('Error en aceptarPedido:', error);
 
-            // Aquí atrapará si no hay stock o si falta la factura
             if (error.message && error.message.startsWith('Error:')) {
                 return res.status(400).json({ error: error.message.replace('Error: ', '') });
             }
@@ -150,7 +145,6 @@ static async subirFactura(req: Request, res: Response) {
             return res.status(500).json({ error: 'Error interno del servidor al aceptar el pedido.' });
         }
     }
-    // 6. Obtener Contadores / Estadísticas
     static async contarPedidos(req: Request, res: Response) {
         try {
             const estadisticas = await PedidoService.contarPedidos();
@@ -158,6 +152,33 @@ static async subirFactura(req: Request, res: Response) {
         } catch (error: any) {
             console.error('Error en contarPedidos:', error);
             return res.status(500).json({ error: 'Error interno al obtener los contadores de pedidos.' });
+        }
+    }
+    static async pagarConCredito(req: Request, res: Response) {
+        try {
+            const id_pedido = parseInt(req.params.id as string);
+
+            if (isNaN(id_pedido)) {
+                return res.status(400).json({ error: 'Se requiere un ID de pedido válido.' });
+            }
+
+            const mensaje = await PedidoService.pagarPedidoConCredito(id_pedido);
+
+            const mensajeMinusculas = mensaje.toLowerCase();
+            if (
+                mensajeMinusculas.includes('error') || 
+                mensajeMinusculas.includes('insuficiente') || 
+                mensajeMinusculas.includes('no tiene') ||
+                mensajeMinusculas.includes('procesado anteriormente')
+            ) {
+                return res.status(400).json({ error: mensaje });
+            }
+
+            return res.status(200).json({ mensaje: mensaje });
+
+        } catch (error: any) {
+            console.error('Error en el controlador al pagar pedido con crédito:', error);
+            return res.status(500).json({ error: 'Error interno del servidor al procesar el pago con crédito.' });
         }
     }
 }
