@@ -304,13 +304,16 @@ CREATE TABLE detalles_cotizacion (
     
     -- DATOS DE LA PARTIDA
     cantidad_producto INT,
-    origen VARCHAR(150),             -- Texto extra para este producto específico (Ej. AVION 30%)
-    tiempo_entrega VARCHAR(100),     -- Ej. "1-2 DIAS SPV" o "INMEDIATO"
+    origen VARCHAR(150),
+    tiempo_entrega VARCHAR(100),
     
     -- PRECIOS Y COSTOS EXTRA
     precio_unitario_cotizado DECIMAL(10,2),
-    costo_flete DECIMAL(10,2) DEFAULT 0.00, -- Costo de traer el producto, si aplica
+    costo_flete DECIMAL(10,2) DEFAULT 0.00,
+    tipo_flete ENUM('PORCENTAJE', 'FIJO') NULL,   -- COLUMNA AGREGADA
+    valor_flete DECIMAL(10,2) DEFAULT 0.00,       -- COLUMNA AGREGADA
     moneda_flete ENUM('MXN','USD') NOT NULL DEFAULT 'MXN',
+    
     -- LLAVES FORÁNEAS
     FOREIGN KEY (id_producto) REFERENCES productos(id),
     FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
