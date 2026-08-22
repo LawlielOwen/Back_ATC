@@ -1,40 +1,41 @@
-
 export interface Cotizacion {
     id: number;
     num_cotizacion: string;
-    fecha: string;
+    id_asesor: number;             
+    nombre_asesor: string;          
+    fecha: string;                 
     Estatus: number;
     id_cliente?: number | null;
-    nombre_cliente_final: string; 
+    nombre_cliente_final: string;  
     rfc_cliente?: string | null;
-    extra_descripcion?: string;
+    contacto: string;
+    ciudad_destino: string;
+    moneda: string;
+    vigencia_dias: number;
     tipo_cambio: number;
     subtotal: number;
     iva: number;
     total: number;
-    nombre_prospecto: string;
     total_tipos_productos: number;
     total_piezas: number;
-    vigencia_dias: number;
-    moneda: string;
-    ciudad_destino: string;
-    contacto: string;
 }
 
 export interface DetalleCotizacion {
     id_detalle: number;
     id_cotizacion: number;
-    id_producto: number;
-    Codigo_japon: string;
-    Codigo_numeral: string;
+    id_producto?: number | null;    
+    codigo_producto: string;       
     nombre_producto: string;
-    modelo_producto: string;
-    marca_producto: string;
+    extra_descripcion?: string;
+    marca_producto?: string;        
+
     cantidad_producto: number;
-    precio_unitario_cotizado: number;
-    subtotal_partida: number; 
-    extra_descripcion: string;
+    origen?: string;               
     tiempo_entrega: string;
+    
+    precio_unitario_cotizado: number;
+    costo_flete: number;            
+    subtotal_partida: number;     
 }
 
 export interface CotizacionCompleta extends Cotizacion {

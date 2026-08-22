@@ -1,18 +1,18 @@
 import rateLimit from 'express-rate-limit';
 
-// 1. Límite Global Estándar (Para operaciones normales CRUD)
+// 1. Límite Global Estándar
 export const standardLimiter = rateLimit({
-    windowMs: 10 * 60 * 1000, // 10 minutos
-    max: 2000, // Lo subimos a 2000 pensando en múltiples usuarios bajo la misma IP de oficina
+    windowMs: 10 * 60 * 1000, 
+    max: 2000,
     message: "Se han realizado demasiadas solicitudes, por favor intente de nuevo más tarde.",
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-// 2. Límite Ultra Estricto para Autenticación (Previene ataques de fuerza bruta)
+// 2. Límite Ultra Estricto para Autenticación 
 export const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 15, // Solo 15 intentos de login por IP cada 15 minutos
+    max: 15, 
     message: "Demasiados intentos de inicio de sesión, cuenta bloqueada temporalmente.",
     standardHeaders: true,
     legacyHeaders: false,

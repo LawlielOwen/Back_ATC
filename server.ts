@@ -23,6 +23,9 @@ import ProveedorRouter from './Router/Proveedor';
 import PedidosRouter from './Router/pedidos';
 import MetricasRouter from './Router/Metricas';
 import TicketRouter from './Router/Ticket';
+import DemosRouter from './Router/Demos';
+import VisitasRouter from './Router/Visitas';
+import ProyectoRouter from './Router/Proyecto';
 // Middleware
 import cors from 'cors';
 import { standardLimiter, loginLimiter, searchLimiter } from './middleware/rate-limit';
@@ -65,7 +68,9 @@ app.use('/api', ValesRouter);
 app.use('/api', ProveedorRouter);
 app.use('/api', PedidosRouter);
 app.use('/api', TicketRouter);
-
+app.use('/api', DemosRouter);
+app.use('/api', VisitasRouter);
+app.use('/api', ProyectoRouter);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 LimpiezaJob.iniciarMantenimiento();
 NotificacionesJob.iniciarTareasProgramadas();

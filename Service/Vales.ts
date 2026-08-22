@@ -75,8 +75,33 @@ static async solicitarVale(id_asesor: number, id_cliente: number, id_pedido: num
         const [rows]: any = await pool.query('CALL sp_obtener_productos_vale(?)', [id]);
         return rows[0];
     }
-    static async pedidosDisponiblesVale(id_asesor: number) {
-    const [rows]: any = await pool.query('CALL sp_pedidos_disponibles_para_vale(?)', [id_asesor]);
-    return rows[0]; 
-}
+ static async pedidosDisponiblesVale(id_asesor: number, rol: string) {
+        const [rows]: any = await pool.query('CALL sp_pedidos_disponibles_para_vale(?, ?)', [id_asesor, rol]);
+        return rows[0]; 
+    }
+
+   static async solicitarValeDemo(id_asesor: number, id_cliente: number | null, empresa_no_registrada: string | null, id_visita: number, productos: any[]) {
+        const productosString = JSON.stringify(productos);
+        const [rows]: any = await pool.query('CALL sp_crear_solicitud_vale_demo(?, ?, ?, ?, ?)', [
+            id_asesor,
+            id_cliente || null,
+            empresa_no_registrada || null, 
+            id_visita,
+            productosString
+        ]);
+        return rows;
+    }
+
+    static async aceptarValeDemo(id_vale: number, comentario: string) {
+        const [rows]: any = await pool.query('CALL sp_autorizar_vale_demo(?, ?)', [
+            id_vale,
+            comentario || ''
+        ]);
+        return rows;
+    }
+    static async visitasDisponiblesVale(id_tecnico: number) {
+        const [rows]: any = await pool.query('CALL sp_visitas_disponibles_para_vale(?)', [id_tecnico]);
+        
+        return rows[0]; 
+    }
 }

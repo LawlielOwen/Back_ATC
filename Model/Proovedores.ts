@@ -10,5 +10,5 @@ export interface ProductoRecepcion {
 export interface RecepcionPedidoPayload {
     id_pedido: number;
     id_asesor: number;
-    productos: ProductoRecepcion[]; // Arreglo con la lista de lo que llegó
+    productos: ProductoRecepcion[]; 
 }

@@ -8,7 +8,7 @@ static async buscarYFiltrar(
     estatus: number = -1, 
     fechaInicio: string | null, 
     fechaFin: string | null, 
-    idAsesor: number | null,     // NUEVO
+    idAsesor: number | null,    
     pagina: number = 1, 
     limite: number = 10
 ): Promise<PedidoResponse> {
@@ -36,7 +36,6 @@ static async buscarYFiltrar(
     };
 }
 
-    // 2. Obtener Detalles de un Pedido (Productos)
     static async obtenerDetallesPorId(id_pedido: number): Promise<DetallePedido[]> {
         const [detalles]: any = await pool.query(`
             SELECT * FROM verDetallesPedido 
@@ -46,7 +45,6 @@ static async buscarYFiltrar(
         return detalles;
     }
 
-    // 3. Subir Factura
    static async subirFactura(id_pedido: number, nombre_factura: string, factura_ruta: string) {
         const connection = await pool.getConnection();
         try {
@@ -71,7 +69,6 @@ static async buscarYFiltrar(
         }
     }
 
-    // 4. Cancelar Pedido
     static async cancelarPedido(id_pedido: number): Promise<string> {
         const connection = await pool.getConnection();
         try {
@@ -124,12 +121,18 @@ static async buscarYFiltrar(
 
         const [rows]: any = await pool.query(query);
 
-        // Si la tabla está vacía, rows[0] podría devolver nulls, así que aseguramos un 0
         return {
             pendientes: rows[0].pendientes || 0,
             cancelados: rows[0].cancelados || 0,
             pagados: rows[0].pagados || 0,
             total_mes: rows[0].total_mes || 0
         };
+    }
+    static async pagarPedidoConCredito(id_pedido: number): Promise<string> {
+        await pool.query('CALL sp_pagar_pedido_con_credito(?, @mensaje)', [id_pedido]);
+
+        const [rows]: any = await pool.query('SELECT @mensaje AS mensaje');
+        
+        return rows[0].mensaje;
     }
 }

@@ -7,14 +7,12 @@ import { uploadRecibo } from '../middleware/multerCSF';
 
 const router = Router();
 
-// Ajusta los '../' según tu estructura
 const csfDir = path.join(process.cwd(), 'uploads/CSF');
 
 if (!fs.existsSync(csfDir)) {
     fs.mkdirSync(csfDir, { recursive: true });
 }
 
-// 2. Configuración de almacenamiento en Disco
 const storageDisk = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, csfDir); 
@@ -34,9 +32,8 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     }
 };
 
-const limits = { fileSize: 5 * 1024 * 1024 }; // 5 MB
+const limits = { fileSize: 5 * 1024 * 1024 }; 
 
-// 5. Instancias de Multer Blindadas
 const uploadDisk = multer({ storage: storageDisk, fileFilter: fileFilter, limits: limits });
 const uploadMemory = multer({ storage: multer.memoryStorage(), fileFilter: fileFilter, limits: limits });
 
@@ -46,9 +43,9 @@ router.get('/clientes/buscar', ClienteController.buscaryfiltrarClientes);
 router.get('/clientes/:id', ClienteController.getClientePorId);
 router.post('/clientes/procesar-csf', uploadMemory.single('archivo'), ClienteController.procesarCSF);
 router.post('/clientes', uploadDisk.single('archivo'), ClienteController.agregarCliente);
-router.put('/clientes/:id', ClienteController.actualizarCliente);
+router.put('/clientes/:id', uploadDisk.single('archivo'), ClienteController.actualizarCliente);
 router.delete('/clientes/:id', ClienteController.eliminarCliente);
 router.put('/clientes/:id/activar', ClienteController.activarCliente);
 router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), ClienteController.subirCSF);
-
+router.put('/clientes/:id/credito', ClienteController.asignarCredito);
 export default router;

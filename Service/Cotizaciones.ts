@@ -23,7 +23,7 @@ export class CotizacionService {
             paginaActual: pagina
         };
     }
-static async guardarCotizacion(c: any): Promise<number> {
+    static async guardarCotizacion(c: any): Promise<number> {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -36,7 +36,7 @@ static async guardarCotizacion(c: any): Promise<number> {
                 c.ciudad_destino || null,
                 c.moneda || 'MONEDA NACIONAL',
                 c.tipo_cambio,
-                c.vigencia_dias || 15, 
+                c.vigencia_dias || 15,
                 c.subtotal,
                 c.iva,
                 c.total
@@ -47,45 +47,28 @@ static async guardarCotizacion(c: any): Promise<number> {
 
             if (c.detalles && c.detalles.length > 0) {
                 for (const item of c.detalles) {
-                    
-                    // =================================================================
-                    // 1. Consultar la marca y el origen fijo del producto en la BD
-                    // =================================================================
-                    const [prodRows]: any = await connection.query(
-                        `SELECT m.Nombre AS marca, p.origen 
-                         FROM productos p 
-                         LEFT JOIN marca_proveedor m ON p.id_marca = m.id 
-                         WHERE p.id = ?`, 
-                        [item.id_producto]
-                    );
-                    
-                    const productoInfo = prodRows[0] || {};
-                    let origenFinal = item.origen; // Por defecto, asumimos que el frontend manda el origen manual
-                    
-                    // =================================================================
-                    // 2. Lógica de Negocio: SMC tiene origen fijo, sobreescribimos lo del frontend
-                    // =================================================================
-                    if (productoInfo.marca === 'SMC') {
-                        // Forzamos el origen que ya está registrado en el inventario
-                        origenFinal = productoInfo.origen; 
-                    }
 
-                    // =================================================================
-                    // 3. Insertar el detalle con el origen ya definido
-                    // =================================================================
                     await connection.query(
                         `INSERT INTO detalles_cotizacion 
-                        (id_producto, id_cotizacion, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado) 
-                        VALUES (?, ?, ?, ?, ?, ?)`,
+(id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                         [
-                            item.id_producto,
                             idCotizacion,
+                            item.id_producto || null,
+                            item.codigo_manual || null,
+                            item.descripcion_manual || null,
+                            item.extra_descripcion_manual || null,
                             item.cantidad_producto,
-                            origenFinal || null, // Se guardará el fijo de SMC o el manual del frontend
-                            item.tiempo_entrega || 'INMEDIATO', 
-                            item.precio_unitario_cotizado
+                            item.origen || null,
+                            item.tiempo_entrega || 'INMEDIATO',
+                            item.precio_unitario_cotizado,
+                            item.tipo_flete || 'FIJO',
+                            item.valor_flete || 0,
+                            item.moneda_flete || 'MXN',
+                            item.costo_flete || 0
                         ]
                     );
+
                 }
             }
 
@@ -99,72 +82,62 @@ static async guardarCotizacion(c: any): Promise<number> {
             connection.release();
         }
     }
-  static async modificarCotizacion(id: number, c: any) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-            
-            // 1. Actualizamos la cabecera enviando los 11 parámetros requeridos por el SP
-            await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-                id,
-                c.id_cliente || null,
-                c.nombre_prospecto || null,
-                c.contacto || null,
-                c.ciudad_destino || null,
-                c.moneda || 'MONEDA NACIONAL',
-                c.tipo_cambio,
-                c.vigencia_dias || 15,
-                c.subtotal,
-                c.iva,
-                c.total
-            ]);
-            
-            await connection.query('DELETE FROM detalles_cotizacion WHERE id_cotizacion = ?', [id]);
-            
-            if (c.detalles && c.detalles.length > 0) {
-                for (const item of c.detalles) {
-                    
-                    const [prodRows]: any = await connection.query(
-                        `SELECT m.Nombre AS marca, p.origen 
-                         FROM productos p 
-                         LEFT JOIN marca_proveedor m ON p.id_marca = m.id 
-                         WHERE p.id = ?`, 
-                        [item.id_producto]
-                    );
-                    
-                    const productoInfo = prodRows[0] || {};
-                    let origenFinal = item.origen; 
-                    
-                    if (productoInfo.marca === 'SMC') {
-                        origenFinal = productoInfo.origen; 
-                    }
+   static async modificarCotizacion(id: number, c: any) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-                    await connection.query(
-                        `INSERT INTO detalles_cotizacion 
-                        (id_producto, id_cotizacion, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado) 
-                        VALUES (?, ?, ?, ?, ?, ?)`,
-                        [
-                            item.id_producto, 
-                            id, 
-                            item.cantidad_producto, 
-                            origenFinal || null, 
-                            item.tiempo_entrega || 'INMEDIATO',
-                            item.precio_unitario_cotizado
-                        ]
-                    );
-                }
+        await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            id,
+            c.id_cliente || null,
+            c.nombre_prospecto || null,
+            c.contacto || null,
+            c.ciudad_destino || null,
+            c.moneda || 'MONEDA NACIONAL',
+            c.tipo_cambio,
+            c.vigencia_dias || 15,
+            c.subtotal,
+            c.iva,
+            c.total
+        ]);
+
+        await connection.query('DELETE FROM detalles_cotizacion WHERE id_cotizacion = ?', [id]);
+        if (c.detalles && c.detalles.length > 0) {
+            for (const item of c.detalles) {
+
+                await connection.query(
+                    `INSERT INTO detalles_cotizacion 
+                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        id,
+                        item.id_producto || null,
+                        item.codigo_manual || null,
+                        item.descripcion_manual || null,
+                        item.extra_descripcion_manual || null,
+                        item.cantidad_producto,
+                        item.origen || null,
+                        item.tiempo_entrega || 'INMEDIATO',
+                        item.precio_unitario_cotizado,
+                        item.tipo_flete || 'FIJO',
+                        item.valor_flete || 0,
+                        item.moneda_flete || 'MXN',
+                        item.costo_flete || 0
+                    ]
+                );
             }
-            
-            await connection.commit();
-            return { mensaje: 'Cotización actualizada correctamente' };
-
-        } catch (error: any) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
         }
+
+        await connection.commit();
+        return { mensaje: 'Cotización actualizada correctamente' };
+
+    } catch (error: any) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
+}
     static async cancelarCotizacion(id: number) {
         const [rows]: any = await pool.query('call CancelarCot(?)', [id]);
         return rows;
@@ -258,7 +231,6 @@ static async guardarCotizacion(c: any): Promise<number> {
     static async generarPDFCotizacion(id_cotizacion: number) {
         const connection = await pool.getConnection();
         try {
-            // 1. Obtener datos principales de la cotización y cliente
             const [cotizaciones]: any = await connection.query(`
                 SELECT c.*, 
                        COALESCE(cl.Nombre, c.nombre_prospecto) AS nombre_cliente_final,
@@ -278,82 +250,75 @@ static async guardarCotizacion(c: any): Promise<number> {
 
             // 2. Obtener las partidas (productos)
             const [detalles]: any = await connection.query(`
-                SELECT d.*, p.Codigo_numeral, p.Descripcion as nombre_producto,p.ExtraDescripcion
-                FROM detalles_cotizacion d
-                LEFT JOIN productos p ON d.id_producto = p.id
-                WHERE d.id_cotizacion = ?
+                SELECT *
+                FROM verDetallesCot
+                WHERE id_cotizacion = ?
             `, [id_cotizacion]);
-
-            // 3. Armar las filas de la tabla
             let filasHtml = '';
 
-            // Verificamos si es USD y si hay un tipo de cambio válido (mayor a 0)
             const esUSD = cot.moneda === 'USD';
             const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
 
-           const escapeHtml = (str: any) => {
-    if (str === null || str === undefined) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-};
+            const escapeHtml = (str: any) => {
+                if (str === null || str === undefined) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            };
 
-detalles.forEach((item: any, index: number) => {
-    const precioUnitarioConvertido = Number(item.precio_unitario_cotizado) / factorConversion;
-    const subtotalLineaConvertido = (item.cantidad_producto * Number(item.precio_unitario_cotizado)) / factorConversion;
+            detalles.forEach((item: any, index: number) => {
+                const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
+                const precioUnitarioConvertido = precioTotalPartida / factorConversion;
 
-    const origen = item.origen ? String(item.origen).trim() : '';
+                const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
 
+                const origen = item.origen ? String(item.origen).trim() : '';
+                const esOrigenRojo = /reab|obsoleto/i.test(origen);
 
-    const esOrigenRojo = /reab|obsoleto/i.test(origen);
+                const celdaExtra = origen
+                    ? `<div class="extra-desc-flex has-origen">
+                            <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+                            <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
+                       </div>`
+                    : `<div class="extra-desc-flex">
+                            <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+                       </div>`;
 
-    const celdaExtra = origen
-        ? `<div class="extra-desc-flex has-origen">
-                <span class="extra-desc-text">${escapeHtml(item.ExtraDescripcion)}</span>
-                <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
-           </div>`
-        : `<div class="extra-desc-flex">
-                <span class="extra-desc-text">${escapeHtml(item.ExtraDescripcion)}</span>
-           </div>`;
+                filasHtml += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.cantidad_producto}</td>
+                    <!-- Usamos codigo_producto que trae el del catálogo o el manual -->
+                    <td>${item.codigo_producto}</td>
+                    <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
+                    <td class="text-left">${celdaExtra}</td>
+                    <td>${item.tiempo_entrega || 'INMEDIATO'}</td>
+                    <td>$${precioUnitarioConvertido.toFixed(2)}</td>
+                    <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+                </tr>`;
+            });
 
-    filasHtml += `
-    <tr>
-        <td>${index + 1}</td>
-        <td>${item.cantidad_producto}</td>
-        <td>${item.Codigo_numeral || 'S/C'}</td>
-        <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
-        <td class="text-left">${celdaExtra}</td>
-        <td>${item.tiempo_entrega || 'INMEDIATO'}</td>
-        <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-        <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
-    </tr>`;
-});
-
-           const FILAS_MINIMAS = 6;
-for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
-    filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-}
+            const FILAS_MINIMAS = 6;
+            for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
+                filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
 
 
             const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
             const rutaLogo = path.join(__dirname, '../assets/logo_atc.png');
             const rutaSMC = path.join(__dirname, '../assets/smc.png');
             const rutaBanner = path.join(__dirname, '../assets/banner.png');
-            // Leer HTML como texto
             let htmlString = fs.readFileSync(rutaPlantilla, 'utf8');
 
-            // Leer imágenes y convertirlas a Base64 para inyectarlas directamente
             const logoBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaLogo, 'base64');
             const bannerBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaBanner, 'base64');
             const smcBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaSMC, 'base64');
 
             const htmlListo = htmlString
-                // Primero inyectamos las imágenes en Base64
                 .replace(/{{logo_atc_base64}}/g, logoBase64)
                 .replace(/{{banner_marcas_base64}}/g, bannerBase64)
                 .replace(/{{smc_base64}}/g, smcBase64)
-                // Luego inyectamos los datos de la base de datos
                 .replace(/{{num_cotizacion}}/g, cot.num_cotizacion || '')
                 .replace(/{{fecha}}/g, new Date(cot.fecha).toLocaleDateString('es-MX'))
                 .replace(/{{nombre_cliente}}/g, cot.nombre_cliente_final || '')
@@ -372,59 +337,58 @@ for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
                 .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
                 .replace(/{{texto_monto_letras}}/g, 'AQUÍ VA TU TEXTO EN LETRAS');
 
-          const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
-});
+            const browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
+            });
 
-const page = await browser.newPage();
+            const page = await browser.newPage();
 
-const DPI = 96;
-const anchoHojaPulgadas = 11;
-const altoHojaPulgadas = 8.5;
-const margenPulgadas = 10 / 25.4;
+            const DPI = 96;
+            const anchoHojaPulgadas = 11;
+            const altoHojaPulgadas = 8.5;
+            const margenPulgadas = 10 / 25.4;
 
-const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
-const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
+            const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
+            const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
 
-await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
-await page.setContent(htmlListo, { waitUntil: 'load' });
+            await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
+            await page.setContent(htmlListo, { waitUntil: 'load' });
 
-const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
+            const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
 
-let escala = 1;
-if (alturaContenidoPx > altoUtilPx) {
-    escala = altoUtilPx / alturaContenidoPx;
-    escala = Math.max(escala, 0.65); 
-}
+            let escala = 1;
+            if (alturaContenidoPx > altoUtilPx) {
+                escala = altoUtilPx / alturaContenidoPx;
+                escala = Math.max(escala, 0.65);
+            }
 
-const pdfBuffer = await page.pdf({
-    format: 'Letter',
-    printBackground: true,
-    landscape: true,
-    scale: escala,   
-    margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
-});
+            const pdfBuffer = await page.pdf({
+                format: 'Letter',
+                printBackground: true,
+                landscape: true,
+                scale: escala,
+                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
+            });
 
-await browser.close();
-return pdfBuffer;
+            await browser.close();
+            return pdfBuffer;
 
         } finally {
-            // Siempre liberamos la conexión a la base de datos
             connection.release();
         }
     }
     static async vincularCliente(id_cotizacion: number, id_cliente: number) {
-    const connection = await pool.getConnection();
-    try {
-        await connection.query(
-            'UPDATE cotizaciones SET id_cliente = ? WHERE id = ?', 
-            [id_cliente, id_cotizacion]
-        );
-        return { mensaje: 'Cliente vinculado correctamente a la cotización.' };
-    } finally {
-        connection.release();
+        const connection = await pool.getConnection();
+        try {
+            await connection.query(
+                'UPDATE cotizaciones SET id_cliente = ? WHERE id = ?',
+                [id_cliente, id_cotizacion]
+            );
+            return { mensaje: 'Cliente vinculado correctamente a la cotización.' };
+        } finally {
+            connection.release();
+        }
     }
-}
 }

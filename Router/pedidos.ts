@@ -14,5 +14,5 @@ router.post('/pedido/:id/factura', uploadRecibo.single('factura'), PedidoControl
 router.post('/pedido/:id/aceptar', PedidoController.aceptarPedido);
 
 router.post('/pedido/:id/cancelar', PedidoController.cancelarPedido);
-
+router.post('/pedido/:id/pagar-credito', PedidoController.pagarConCredito);
 export default router;
