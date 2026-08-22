@@ -3099,7 +3099,6 @@ BEGIN
 END $$
 
 DELIMITER ;
-sp_completar_visita_demo
 
 DELIMITER $$
 CREATE PROCEDURE sp_cancelar_visita_demo(
