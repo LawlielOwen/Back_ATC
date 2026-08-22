@@ -2867,10 +2867,10 @@ sp_main: BEGIN
     FROM cotizaciones WHERE id = v_id_cotizacion;
 
     -- 3. VALIDACIÓN DE MONEDA (Opción 1: crédito solo disponible en MXN)
-    IF v_moneda IS NULL OR v_moneda <> 'MXN' THEN
-        SET p_mensaje = 'El pago con línea de crédito solo está disponible para pedidos en MXN. Este pedido está en otra moneda; utiliza el flujo de subir recibo de pago.';
-        LEAVE sp_main;
-    END IF;
+   IF v_moneda = 'USD' THEN
+    SET p_mensaje = 'El pago con línea de crédito solo está disponible para pedidos en MXN. Este pedido está en dólares; utiliza el flujo de subir recibo de pago.';
+    LEAVE sp_main;
+END IF;
 
     -- Pre-check de crédito (para dar feedback rápido; el check real y definitivo
     -- ocurre más abajo, ya con el registro bloqueado dentro de la transacción)
