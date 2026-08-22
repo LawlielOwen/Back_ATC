@@ -4,6 +4,7 @@ import { ClienteController } from '../Controller/ClienteController';
 import fs from 'fs';
 import path from 'path';
 import { uploadRecibo } from '../middleware/multerCSF'; 
+import { validarPDFReal } from '../middleware/validarPDFReal';
 
 const router = Router();
 
@@ -39,13 +40,14 @@ const uploadMemory = multer({ storage: multer.memoryStorage(), fileFilter: fileF
 
 router.get('/clientes', ClienteController.getClientes);
 router.get('/clientes/count', ClienteController.contarClientes);
-router.get('/clientes/buscar', ClienteController.buscaryfiltrarClientes); 
+router.get('/clientes/buscar', ClienteController.buscaryfiltrarClientes);
+router.post('/clientes', uploadDisk.single('archivo'), validarPDFReal, ClienteController.agregarCliente);
+router.post('/clientes/procesar-csf', uploadMemory.single('archivo'), validarPDFReal, ClienteController.procesarCSF);
 router.get('/clientes/:id', ClienteController.getClientePorId);
-router.post('/clientes/procesar-csf', uploadMemory.single('archivo'), ClienteController.procesarCSF);
-router.post('/clientes', uploadDisk.single('archivo'), ClienteController.agregarCliente);
-router.put('/clientes/:id', uploadDisk.single('archivo'), ClienteController.actualizarCliente);
+
+router.put('/clientes/:id', uploadDisk.single('archivo'), validarPDFReal, ClienteController.actualizarCliente);
 router.delete('/clientes/:id', ClienteController.eliminarCliente);
 router.put('/clientes/:id/activar', ClienteController.activarCliente);
-router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), ClienteController.subirCSF);
+router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), validarPDFReal, ClienteController.subirCSF);
 router.put('/clientes/:id/credito', ClienteController.asignarCredito);
 export default router;

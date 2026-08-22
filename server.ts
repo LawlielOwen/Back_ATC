@@ -27,6 +27,7 @@ import DemosRouter from './Router/Demos';
 import VisitasRouter from './Router/Visitas';
 import ProyectoRouter from './Router/Proyecto';
 // Middleware
+import multer from 'multer';
 import cors from 'cors';
 import { standardLimiter, loginLimiter, searchLimiter } from './middleware/rate-limit';
 import { verificarToken } from './middleware/Auth.middleware ';
@@ -98,6 +99,17 @@ server.listen(3000, () => {
     console.log(` Servidor HTTP y WebSockets corriendo en el puerto 3000, BD en: ${process.env.DB_HOST}`);
 });
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'El archivo excede el tamaño máximo permitido (5MB).' });
+        }
+        return res.status(400).json({ error: `Error al subir el archivo: ${err.message}` });
+    }
+
+    if (typeof err.message === 'string' && err.message.startsWith('FORMATO_INVALIDO')) {
+        return res.status(400).json({ error: err.message });
+    }
+
     console.error(err.stack);
     res.status(500).json({ error: 'Error interno del servidor' });
 });
