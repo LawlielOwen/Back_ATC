@@ -90,99 +90,13 @@ CREATE TABLE cliente_asesor (
     FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE CASCADE,
     FOREIGN KEY (id_asesor) REFERENCES asesores(id) ON DELETE CASCADE
 );
--- 4. Tabla Cotizaciones (Depende de Clientes)
-CREATE TABLE cotizaciones (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    num_cotizacion VARCHAR(20),
-    id_asesor INT,                   -- NUEVO: Para saber exactamente quién hizo la cotización
-    Estatus INT,
-    id_cliente INT NULL,
-    nombre_prospecto VARCHAR(150),
-    contacto VARCHAR(150),           -- NUEVO: Persona a la que va dirigida (Ej. Luis Imperial)
-    ciudad_destino VARCHAR(100),     -- NUEVO: Ciudad que aparece en el PDF (Ej. LEON GTO)
-    tipo_cambio DECIMAL(10,4),
-    moneda VARCHAR(20) DEFAULT 'MONEDA NACIONAL', -- NUEVO: Para especificar MXN o USD
-    fecha DATE,
-    vigencia_dias INT DEFAULT 15,    -- NUEVO: Días de validez del documento
-    ruta_cotizacion TEXT,
-    subtotal DECIMAL(10,2),
-    iva DECIMAL(10,2),
-    total DECIMAL(10,2),
-    
-    -- NUEVAS COLUMNAS PARA EL MÓDULO DE PROYECTOS
-    id_proyecto INT NULL COMMENT 'Enlace al proyecto de soporte (si aplica)',
-    num_revision INT DEFAULT 0 COMMENT 'Contador de modificaciones hechas por el cliente',
-    
-    -- LLAVES FORÁNEAS
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
-    FOREIGN KEY (id_proyecto) REFERENCES proyectos_soporte(id) ON DELETE SET NULL ON UPDATE CASCADE
-);
 
 
 -- 7. Tabla movimientos (Depende de Productos)
 
-CREATE TABLE movimientos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    id_producto INT NULL,           -- NULL cuando se mueva un demo
-    id_demo INT NULL,               -- NULL cuando se mueva un producto normal
-    id_asesor INT NOT NULL,         
-    id_cliente INT NULL,            
-    empresa_no_registrada VARCHAR(250) NULL,
-    tipo_movimiento ENUM('Entrada', 'Salida', 'Ajuste') NOT NULL, 
-    fecha DATETIME NOT NULL,
-    cantidad INT NOT NULL,
-    destino ENUM('Almacen', 'Pedido', 'Demostracion') NOT NULL,
-    FOREIGN KEY (id_producto) REFERENCES productos(id),
-    FOREIGN KEY (id_demo) REFERENCES stock_demo(id),
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id)
-);
 
--- 8. Tabla detalles_cotizacion (Depende de Productos y Cotizaciones)
-CREATE TABLE detalles_cotizacion (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    id_cotizacion INT,
-    
-    -- REFERENCIA AL CATÁLOGO (Opcional si es un producto manual)
-    id_producto INT NULL, 
-    
-    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
-    codigo_manual VARCHAR(100) NULL, 
-    descripcion_manual VARCHAR(250) NULL, 
-    extra_descripcion_manual TEXT NULL, 
-    
-    -- DATOS DE LA PARTIDA
-    cantidad_producto INT,
-    origen VARCHAR(150),             -- Texto extra para este producto específico (Ej. AVION 30%)
-    tiempo_entrega VARCHAR(100),     -- Ej. "1-2 DIAS SPV" o "INMEDIATO"
-    
-    -- PRECIOS Y COSTOS EXTRA
-    precio_unitario_cotizado DECIMAL(10,2),
-    costo_flete DECIMAL(10,2) DEFAULT 0.00, -- Costo de traer el producto, si aplica
-    moneda_flete ENUM('MXN','USD') NOT NULL DEFAULT 'MXN',
-    -- LLAVES FORÁNEAS
-    FOREIGN KEY (id_producto) REFERENCES productos(id),
-    FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
-);
--- 9. Tabla Pedidos (Depende de Clientes, Asesores y Cotizaciones)
-CREATE TABLE pedidos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    id_cliente INT,
-    id_asesor INT,
-    orden_compra VARCHAR(100),
-    nombre_factura VARCHAR(100),
-    factura_ruta TEXT,
-    fecha_factura DATETIME,
-    fecha DATE,
-    fecha_limite DATE,
-    Estatus INT,
-    id_cotizacion INT,
-    alerta_enviada TINYINT,
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
-    FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
-);
+
+
 
 -- 10. Tabla pedidos_proveedores (Depende de Asesores y Productos)
 CREATE TABLE pedidos_proveedores (
@@ -233,64 +147,6 @@ CREATE TABLE detalles_pedido_proveedor (
     FOREIGN KEY (id_pedido) REFERENCES pedidos_proveedores(id),
     FOREIGN KEY (id_producto) REFERENCES productos(id) -- Ajusta el nombre de tu tabla de productos
 );
-
-CREATE TABLE detalles_pedido (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    id_pedido INT NOT NULL,
-    
-    -- REFERENCIA AL CATÁLOGO (Ahora es Opcional/NULL)
-    id_producto INT NULL,
-    
-    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
-    codigo_manual VARCHAR(100) NULL,
-    descripcion_manual VARCHAR(250) NULL,
-    extra_descripcion_manual TEXT NULL,
-    
-    -- CANTIDADES
-    cantidad INT NOT NULL,
-    cantidad_surtida INT NOT NULL DEFAULT 0,
-    
-    -- COSTOS
-    precio_unitario DECIMAL(10,2) NOT NULL,
-    costo_flete DECIMAL(10,2) DEFAULT 0.00,
-    
-    estatus_surtido TINYINT DEFAULT 0, -- 0: Pendiente, 1: Surtido/Descontado
-    
-    FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
-    FOREIGN KEY (id_producto) REFERENCES productos(id)
-);
-
--- 5. Tabla Vales_salida (Depende de Asesores y Clientes)
-CREATE TABLE vales_salida (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    consecutivo_anual INT NOT NULL,
-    id_asesor INT NOT NULL,
-    id_cliente INT NULL,            -- Permitimos NULL en caso de que visiten una empresa no registrada
-    empresa_no_registrada VARCHAR(550) NULL,
-    id_pedido INT NULL,             -- NULL si el vale es para una demostración
-    id_visita INT NULL,             -- NULL si el vale es para una venta normal
-    tipo_vale ENUM('Venta', 'Demostracion') DEFAULT 'Venta',
-    fecha DATETIME NOT NULL,
-    comentario VARCHAR(255) NULL,
-    alerta_enviada TINYINT DEFAULT 0,
-    estatus TINYINT DEFAULT 0,
-    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
-    FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
-    FOREIGN KEY (id_visita) REFERENCES visitas_demostracion(id)
-);
--- 6. Tabla detalles_vale (Depende de Productos y Vales_salida)
-CREATE TABLE detalles_vale (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    id_vale INT NOT NULL,
-    id_producto INT NULL,           -- NULL si se están sacando equipos demo
-    id_demo INT NULL,               -- NULL si se están sacando productos de venta
-    piezas INT NOT NULL,
-    FOREIGN KEY (id_vale) REFERENCES vales_salida(id) ON DELETE CASCADE,
-    FOREIGN KEY (id_producto) REFERENCES productos(id),
-    FOREIGN KEY (id_demo) REFERENCES stock_demo(id)
-);
-
 -- 12. Tabla Tickets (Depende de Asesores y Clientes)
 CREATE TABLE tickets (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -405,3 +261,149 @@ CREATE TABLE bitacora_avances (
         FOREIGN KEY (id_usuario) REFERENCES asesores(id)
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE cotizaciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    num_cotizacion VARCHAR(20),
+    id_asesor INT,                   -- NUEVO: Para saber exactamente quién hizo la cotización
+    Estatus INT,
+    id_cliente INT NULL,
+    nombre_prospecto VARCHAR(150),
+    contacto VARCHAR(150),           -- NUEVO: Persona a la que va dirigida (Ej. Luis Imperial)
+    ciudad_destino VARCHAR(100),     -- NUEVO: Ciudad que aparece en el PDF (Ej. LEON GTO)
+    tipo_cambio DECIMAL(10,4),
+    moneda VARCHAR(20) DEFAULT 'MONEDA NACIONAL', -- NUEVO: Para especificar MXN o USD
+    fecha DATE,
+    vigencia_dias INT DEFAULT 15,    -- NUEVO: Días de validez del documento
+    ruta_cotizacion TEXT,
+    subtotal DECIMAL(10,2),
+    iva DECIMAL(10,2),
+    total DECIMAL(10,2),
+    
+    -- NUEVAS COLUMNAS PARA EL MÓDULO DE PROYECTOS
+    id_proyecto INT NULL COMMENT 'Enlace al proyecto de soporte (si aplica)',
+    num_revision INT DEFAULT 0 COMMENT 'Contador de modificaciones hechas por el cliente',
+    
+    -- LLAVES FORÁNEAS
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_proyecto) REFERENCES proyectos_soporte(id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+-- 8. Tabla detalles_cotizacion (Depende de Productos y Cotizaciones)
+CREATE TABLE detalles_cotizacion (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_cotizacion INT,
+    
+    -- REFERENCIA AL CATÁLOGO (Opcional si es un producto manual)
+    id_producto INT NULL, 
+    
+    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
+    codigo_manual VARCHAR(100) NULL, 
+    descripcion_manual VARCHAR(250) NULL, 
+    extra_descripcion_manual TEXT NULL, 
+    
+    -- DATOS DE LA PARTIDA
+    cantidad_producto INT,
+    origen VARCHAR(150),             -- Texto extra para este producto específico (Ej. AVION 30%)
+    tiempo_entrega VARCHAR(100),     -- Ej. "1-2 DIAS SPV" o "INMEDIATO"
+    
+    -- PRECIOS Y COSTOS EXTRA
+    precio_unitario_cotizado DECIMAL(10,2),
+    costo_flete DECIMAL(10,2) DEFAULT 0.00, -- Costo de traer el producto, si aplica
+    moneda_flete ENUM('MXN','USD') NOT NULL DEFAULT 'MXN',
+    -- LLAVES FORÁNEAS
+    FOREIGN KEY (id_producto) REFERENCES productos(id),
+    FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
+);
+-- 9. Tabla Pedidos (Depende de Clientes, Asesores y Cotizaciones)
+CREATE TABLE pedidos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT,
+    id_asesor INT,
+    orden_compra VARCHAR(100),
+    nombre_factura VARCHAR(100),
+    factura_ruta TEXT,
+    fecha_factura DATETIME,
+    fecha DATE,
+    fecha_limite DATE,
+    Estatus INT,
+    id_cotizacion INT,
+    alerta_enviada TINYINT,
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id)
+);
+
+-- 5. Tabla Vales_salida (Depende de Asesores y Clientes)
+CREATE TABLE vales_salida (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    consecutivo_anual INT NOT NULL,
+    id_asesor INT NOT NULL,
+    id_cliente INT NULL,            -- Permitimos NULL en caso de que visiten una empresa no registrada
+    empresa_no_registrada VARCHAR(550) NULL,
+    id_pedido INT NULL,             -- NULL si el vale es para una demostración
+    id_visita INT NULL,             -- NULL si el vale es para una venta normal
+    tipo_vale ENUM('Venta', 'Demostracion') DEFAULT 'Venta',
+    fecha DATETIME NOT NULL,
+    comentario VARCHAR(255) NULL,
+    alerta_enviada TINYINT DEFAULT 0,
+    estatus TINYINT DEFAULT 0,
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id),
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
+    FOREIGN KEY (id_visita) REFERENCES visitas_demostracion(id)
+);
+-- 6. Tabla detalles_vale (Depende de Productos y Vales_salida)
+CREATE TABLE detalles_vale (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_vale INT NOT NULL,
+    id_producto INT NULL,           -- NULL si se están sacando equipos demo
+    id_demo INT NULL,               -- NULL si se están sacando productos de venta
+    piezas INT NOT NULL,
+    FOREIGN KEY (id_vale) REFERENCES vales_salida(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id),
+    FOREIGN KEY (id_demo) REFERENCES stock_demo(id)
+);
+
+CREATE TABLE movimientos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_producto INT NULL,           -- NULL cuando se mueva un demo
+    id_demo INT NULL,               -- NULL cuando se mueva un producto normal
+    id_asesor INT NOT NULL,         
+    id_cliente INT NULL,            
+    empresa_no_registrada VARCHAR(250) NULL,
+    tipo_movimiento ENUM('Entrada', 'Salida', 'Ajuste') NOT NULL, 
+    fecha DATETIME NOT NULL,
+    cantidad INT NOT NULL,
+    destino ENUM('Almacen', 'Pedido', 'Demostracion') NOT NULL,
+    FOREIGN KEY (id_producto) REFERENCES productos(id),
+    FOREIGN KEY (id_demo) REFERENCES stock_demo(id),
+    FOREIGN KEY (id_asesor) REFERENCES asesores(id),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id)
+);
+
+CREATE TABLE detalles_pedido (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    
+    -- REFERENCIA AL CATÁLOGO (Ahora es Opcional/NULL)
+    id_producto INT NULL,
+    
+    -- CAMPOS COMODÍN PARA PRODUCTOS FUERA DEL SISTEMA
+    codigo_manual VARCHAR(100) NULL,
+    descripcion_manual VARCHAR(250) NULL,
+    extra_descripcion_manual TEXT NULL,
+    
+    -- CANTIDADES
+    cantidad INT NOT NULL,
+    cantidad_surtida INT NOT NULL DEFAULT 0,
+    
+    -- COSTOS
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    costo_flete DECIMAL(10,2) DEFAULT 0.00,
+    
+    estatus_surtido TINYINT DEFAULT 0, -- 0: Pendiente, 1: Surtido/Descontado
+    
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id),
+    FOREIGN KEY (id_producto) REFERENCES productos(id)
+);
