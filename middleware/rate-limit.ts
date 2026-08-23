@@ -12,7 +12,7 @@ export const standardLimiter = rateLimit({
 // 2. Límite Ultra Estricto para Autenticación 
 export const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 15, 
+    max: 200, 
     message: "Demasiados intentos de inicio de sesión, cuenta bloqueada temporalmente.",
     standardHeaders: true,
     legacyHeaders: false,
