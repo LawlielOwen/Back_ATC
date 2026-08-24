@@ -44,21 +44,29 @@ Backend organizado por capas, cada una con una responsabilidad única:
 
 ## 📦 Módulos principales
 
+**Catálogo** — catálogo y gestión general de todos los productos de la sucursal, con precios y existencias.
+
+**Demos** — control de productos actualmente en fase de demostración o prueba.
+
+**Visitas** — registro de las visitas realizadas a clientes para llevar los productos que están en fase de demostración.
+
 **Clientes** — registro de clientes con extracción automática de datos fiscales desde su Constancia de Situación Fiscal (CSF) en PDF, y asignación de línea de crédito.
 
-**Proyectos** — gestiona los proyectos con clientes desde la propuesta hasta el cierre de venta, con flujo de estatus (Alta → Revisión Cliente → Ejecución → Completado) y bitácora auditable de avances.
+**Cotizaciones** — cotizador dinámico que genera propuestas económicas con conversión de divisas, usando el tipo de cambio diario obtenido de la API de Banxico.
+
+**Pedidos** — gestiona los pagos de los pedidos de clientes: subida del recibo de pago proporcionado por el cliente, o uso del crédito autorizado por la sucursal para ese cliente.
 
 **Tickets** — leads de seguimiento asignados a asesores, donde se reporta cada acción realizada a lo largo del lead hasta su cierre.
 
-**Demos y Visitas** — control de productos en fase de demostración/prueba, y registro de visitas a clientes para llevar dichos productos.
+**Proyectos** — gestiona los proyectos con clientes desde la propuesta hasta el cierre de venta, con flujo de estatus (Alta → Revisión Cliente → Ejecución → Completado) y bitácora auditable de avances.
 
-**Pedidos** — gestión de pedidos a proveedores, con verificación automática de fechas: el sistema detecta pedidos a una semana de vencerse y notifica a los asesores de venta.
+**Historial E/S** — historial de las entradas y salidas de las existencias de los productos de la sucursal.
 
-**Recepción** — registra la llegada de pedidos y confirma si llegaron correctos o con incidencias.
+**Vales de salida** — solicitud y control de las salidas de productos para concluir con los pedidos de los clientes y realizar su entrega final, sincronizado en tiempo real vía WebSockets.
 
-**Vales de salida** — control de movimientos de inventario (salida de productos para pedidos o demos), sincronizado en tiempo real vía WebSockets.
+**Recepción** — gestión de los pedidos realizados a proveedores; confirma si la mercancía llegó correcta o con incidencias, con verificación automática de fechas para notificar a los asesores cuando un pedido está por vencerse.
 
-**Cotizador dinámico** — genera propuestas económicas con conversión de divisas, obteniendo el tipo de cambio diario desde la API de Banxico.
+**Asesores** — gestión de los usuarios registrados dentro del sistema (acceso restringido al rol Administrador).
 
 **Métricas (Dashboard)**
 - Comparativo de lo cotizado mensualmente (últimos 3 meses)
@@ -66,6 +74,24 @@ Backend organizado por capas, cada una con una responsabilidad única:
 - Productos estrella por cliente
 - Comparación de lo cotizado vs. lo efectivamente vendido
 
-## ⚙️ Variables de entorno
+## 💱 Manejo de divisas
 
-Crea un archivo `.env` en la raíz basado en este ejemplo:
+Los módulos de Cotizaciones, Pedidos y Métricas trabajan con montos en distintas monedas. Para esto, el backend consume la API SIE (Sistema de Información Económica) del Banco de México, consultando la serie `SF43718` (tipo de cambio FIX), autenticado con un token personal enviado en el header `Bmx-Token` y almacenado como variable de entorno:
+
+```typescript
+const url = `https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno`;
+
+const response = await axios.get(url, {
+  headers: { 'Bmx-Token': process.env.KEY_TOKEN_BANXICO }
+});
+```
+
+El endpoint regresa el tipo de cambio más reciente publicado por Banxico, que se usa para convertir montos entre pesos mexicanos y dólares dentro de cotizaciones, pedidos y los reportes del dashboard.
+
+## 🔗 Repositorio relacionado
+
+Frontend: [Front_ATC](https://github.com/LawlielOwen/Front_ATC)
+
+## 📌 Estado
+
+Sistema en producción activa, utilizado actualmente por los asesores de la sucursal. 
