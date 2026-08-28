@@ -6,6 +6,7 @@ router.get('/visitas', VisitaController.consultarVisitas);
 router.post('/visitas', VisitaController.crearVisita);
 router.get('/visitas/:id', VisitaController.obtenerVisitaPorId);
 router.get('/visitas/:id/detalles', VisitaController.obtenerDetallesVisita);
+router.get('/visitas/:id/pdf', VisitaController.generarPDFVisita);
 router.put('/visitas/:id', VisitaController.completarVisita);
 router.delete('/visitas/:id', VisitaController.cancelarVisita);
 

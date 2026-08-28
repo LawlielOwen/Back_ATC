@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { margin: 8mm; size: letter portrait; }
+        body { font-family: 'Arial', sans-serif; font-size: 9px; color: #000; margin: 0; padding: 0; }
+
+        /* ── ENCABEZADO PRINCIPAL: Logo | Datos empresa | SMC | Folio ── */
+        .main-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 4px;
+        }
+        .header-left {
+            width: 22%;
+            display: flex;
+            align-items: center;
+            padding-top: 10px;
+        }
+        .logo-atc { width: 100%; max-height: 100px; object-fit: contain; }
+
+        .header-info { width: 32%; line-height: 1.25; padding-top: 4px; padding-left: 12px; }
+        .company-name { font-size: 9px; font-weight: bold; }
+        .company-line { font-size: 8.5px; }
+        .company-line.email { color: #0000ee; text-decoration: underline; }
+        .company-line.rfc { color: #0000ee; }
+
+        .header-smc { width: 24%; display: flex; align-items: center; justify-content: center; padding-top: 6px; }
+        .smc-logo { max-width: 100%; max-height: 55px; object-fit: contain; }
+
+        .header-right { width: 22%; text-align: left; padding-top: 6px; }
+        .folio-num { font-size: 9px; line-height: 1.5; font-weight: bold; }
+        .folio-line { font-size: 8.5px; line-height: 1.5; }
+        .folio-bold { font-weight: bold; color: #003B8A; }
+        .fecha-valor { font-weight: normal; }
+        .txt-doc-title {
+            font-style: italic;
+            font-weight: bold;
+            font-size: 11px;
+            margin-top: 8px;
+            color: #0d1f38;
+        }
+        .estatus-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 8px;
+            font-size: 8px;
+            font-weight: bold;
+            border-radius: 4px;
+            border: 0.5px solid #000;
+        }
+        .estatus-completada { background-color: #d4f5e9; color: #0f6e56; border-color: #1D9E75; }
+        .estatus-programada { background-color: #eef2f7; color: #475569; border-color: #94a3b8; }
+        .estatus-cancelada { background-color: #fde8e8; color: #b91c1c; border-color: #db1c1c; }
+
+        /* ── CAJAS: Cliente/Empresa + Personal Responsable ── */
+        .client-contact-wrapper {
+            display: flex;
+            gap: 0px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            page-break-inside: avoid; break-inside: avoid;
+        }
+        .client-col { width: 55%; display: flex; flex-direction: column; }
+        .contact-col { width: 45%; display: flex; flex-direction: column; }
+        .client-box, .contact-box { flex: 1; border: 1px solid #000; border-radius: 6px; overflow: hidden; }
+
+        .section-title {
+            text-align: center;
+            font-weight: bold;
+            font-style: italic;
+            font-size: 9px;
+            padding-bottom: 2px;
+        }
+        .data-cell { padding: 4px 10px 6px; }
+        .kv-table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+        .kv-table td { padding: 1.5px 4px; border: none; }
+        .kv-label { font-weight: bold; width: 30%; white-space: nowrap; }
+        .kv-value { width: 70%; }
+
+        /* ── TABLA DE PRODUCTOS/EQUIPOS ── */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+            border-bottom: 0.5px solid #000;
+            table-layout: fixed;
+            page-break-inside: avoid; break-inside: avoid;
+        }
+        .items-table th {
+            border: 0.5px solid #000;
+            padding: 5px 3px;
+            text-align: center !important;
+            vertical-align: middle;
+            font-size: 8px;
+            font-weight: bold;
+            background-color: #f0f4f8;
+        }
+        .items-table td {
+            border-left: 0.5px solid #000;
+            border-right: 0.5px solid #000;
+            border-top: none;
+            border-bottom: none;
+            padding: 4px 4px;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 8.5px;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+        }
+        .items-table tr:last-child td { border-bottom: 0.5px solid #000; }
+
+        .col-item { width: 6%; }
+        .col-serie { width: 16%; }
+        .col-modelo { width: 26%; text-align: left !important; padding-left: 8px !important; }
+        .col-marca { width: 16%; }
+        .col-cant { width: 10%; }
+        .col-retorno { width: 26%; }
+
+        .badge-retorno {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 7.5px;
+            font-weight: bold;
+            border-radius: 4px;
+            border: 0.5px solid #999;
+            background-color: #f8fafc;
+            color: #475569;
+        }
+
+        /* ── RESUMEN DE ACTIVIDADES ── */
+        .resumen-box {
+            border: 0.5px solid #000;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-top: 12px;
+            font-size: 8.5px;
+            line-height: 1.4;
+            min-height: 40px;
+            page-break-inside: avoid; break-inside: avoid;
+        }
+        .resumen-title {
+            font-weight: bold;
+            font-style: italic;
+            font-size: 9px;
+            margin-bottom: 4px;
+        }
+
+        /* ── TOTAL DE EQUIPOS ── */
+        .total-equipos-box {
+            background-color: #92D050;
+            text-align: right;
+            font-weight: bold;
+            font-size: 9px;
+            padding: 4px 6px;
+            margin-top: 6px;
+        }
+
+        /* ── FIRMAS ── */
+        .firmas-wrapper {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            page-break-inside: avoid; break-inside: avoid;
+        }
+        .firma-box {
+            width: 45%;
+            text-align: center;
+        }
+        .firma-linea {
+            border-top: 0.5px solid #000;
+            margin-bottom: 4px;
+        }
+        .firma-label { font-size: 8px; font-weight: bold; }
+        .firma-sublabel { font-size: 7.5px; color: #64748b; }
+
+        /* ── AVISO LEGAL ── */
+        .terms-box {
+            border: 0.5px solid #000;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 20px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 8px;
+            line-height: 1.4;
+            page-break-inside: avoid; break-inside: avoid;
+        }
+        .terms-line { margin: 0 0 2px 0; }
+        .terms-bold { font-weight: bold; margin-top: 4px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div class="main-header">
+        <div class="header-left">
+            <img src="{{logo_atc_base64}}" class="logo-atc">
+        </div>
+        <div class="header-info">
+            <div class="company-name">AUTOMATIZACION, TECNOLOGIA Y CONTROL S.A. DE C.V.</div>
+            <div class="company-line">AVENIDA CONVENCION DE 1914, PTE. 1132-6</div>
+            <div class="company-line">LA BARRANCA DE GUADALUPE</div>
+            <div class="company-line">TEL / FAX (449) 978-86-10, 978-86-11</div>
+            <div class="company-line rfc">RFC: ATC-120605-E70</div>
+            <div class="company-line email">jmadrigal@atcmx.com.mx</div>
+        </div>
+        <div class="header-smc">
+            <img src="{{smc_base64}}" class="smc-logo">
+        </div>
+        <div class="header-right">
+            <div class="folio-num">Núm. de Visita: <span class="folio-bold">{{folio_visita}}</span></div>
+            <div class="folio-line">Fecha: <span class="fecha-valor">{{fecha_visita}}</span></div>
+            <div class="txt-doc-title">LISTADO DE EQUIPOS DEMO</div>
+            <div class="estatus-badge estatus-{{estatus_clase}}">{{estatus_texto}}</div>
+        </div>
+    </div>
+
+    <div class="client-contact-wrapper">
+
+        <div class="client-col">
+            <div class="section-title">CLIENTE / EMPRESA VISITADA</div>
+            <div class="client-box">
+                <div class="data-cell">
+                    <table class="kv-table">
+                        <tr><td class="kv-label">Empresa:</td><td class="kv-value">{{nombre_cliente}}</td></tr>
+                        <tr><td class="kv-label">Fecha visita:</td><td class="kv-value">{{fecha_visita}}</td></tr>
+                        <tr><td class="kv-label">Estatus:</td><td class="kv-value">{{estatus_texto}}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="contact-col">
+            <div class="section-title">PERSONAL RESPONSABLE</div>
+            <div class="contact-box">
+                <div class="data-cell">
+                    <table class="kv-table">
+                        <tr><td class="kv-label">Asesor:</td><td class="kv-value">{{nombre_asesor}}</td></tr>
+                        <tr><td class="kv-label">Téc. Soporte:</td><td class="kv-value">{{nombre_tecnico}}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th class="col-item">N.</th>
+                <th class="col-serie">N. SERIE</th>
+                <th class="col-modelo">MODELO / EQUIPO</th>
+                <th class="col-marca">MARCA</th>
+                <th class="col-cant">CANTIDAD</th>
+                <th class="col-retorno">ESTATUS DE RETORNO</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{filas_productos}}
+        </tbody>
+    </table>
+
+    <div class="total-equipos-box">
+        TOTAL DE EQUIPOS: {{total_equipos}}
+    </div>
+
+    <div class="resumen-box">
+        <div class="resumen-title">Resumen de Actividades / Observaciones:</div>
+        {{resumen_actividades}}
+    </div>
+
+    <div class="firmas-wrapper">
+        <div class="firma-box">
+            <div class="firma-linea"></div>
+            <div class="firma-label">{{nombre_tecnico}}</div>
+            <div class="firma-sublabel">ENTREGA / SOPORTE TÉCNICO</div>
+        </div>
+        <div class="firma-box">
+            <div class="firma-linea"></div>
+            <div class="firma-label">RECIBE DE CONFORMIDAD</div>
+            <div class="firma-sublabel">CLIENTE</div>
+        </div>
+    </div>
+
+    <div class="terms-box">
+        <div class="terms-line">1.- Este documento acredita la salida temporal de equipos para fines de demostración; no constituye una venta.</div>
+        <div class="terms-line">2.- El cliente se compromete a resguardar los equipos y devolverlos en las condiciones en que fueron entregados.</div>
+        <div class="terms-line">3.- Cualquier daño, pérdida o faltante deberá reportarse de inmediato al asesor responsable.</div>
+        <div class="terms-bold">FAVOR DE CONSERVAR ESTE DOCUMENTO PARA LA DEVOLUCIÓN DE LOS EQUIPOS</div>
+    </div>
+
+</body>
+</html>

@@ -140,4 +140,29 @@ export class VisitaController {
             return res.status(500).json({ error: 'Error interno del servidor al cancelar la visita.' });
         }
     }
+    static async generarPDFVisita(req: Request, res: Response) {
+        try {
+            const id = Number(req.params.id);
+
+            if (isNaN(id)) {
+                return res.status(400).json({ error: 'Se requiere un ID de visita válido.' });
+            }
+
+            const pdfBuffer = await VisitaDemoService.generarPDFVisita(id);
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename=visita_${id}.pdf`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+
+            return res.status(200).end(pdfBuffer);
+        } catch (error: any) {
+            console.error('Error al generar el PDF de la visita:', error);
+
+            if (error.message === 'Visita no encontrada') {
+                return res.status(404).json({ error: 'La visita especificada no existe.' });
+            }
+
+            return res.status(500).json({ error: 'Error interno del servidor al generar el PDF.' });
+        }
+    }
 }

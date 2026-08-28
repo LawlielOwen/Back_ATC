@@ -33,35 +33,45 @@ export class ClienteService {
             paginaActual: pagina
         };
     }
-    static async obtenerClientePorId(id: number) {
-        const [rows]: any = await pool.query('SELECT * FROM verClientes WHERE id = ?', [id]);
-        const cliente = rows[0];
-        if (!cliente) return null;
-
-        const [relaciones]: any = await pool.query(
-            'SELECT id_asesor, asesor_tipo, marcas_asignadas FROM cliente_asesor WHERE id_cliente = ?',
-            [id]
-        );
-
-        cliente.asesoresAsignados = relaciones.length > 0
-            ? relaciones.map((r: any) => ({
-                id_asesor: r.id_asesor.toString(),
-                asesor_tipo: r.asesor_tipo,
-                marcasArray: (r.marcas_asignadas || '')
-                    .split(',')
-                    .map((m: string) => m.trim())
-                    .filter((m: string) => m.length > 0),
-                marcas_asignadas: r.marcas_asignadas || ''
-            }))
-            : [{ id_asesor: '', asesor_tipo: '', marcasArray: [], marcas_asignadas: '' }];
-
-        return cliente;
-    }
+   
 
     static async eliminarCliente(id: number) {
         const [rows]: any = await pool.query('call sp_eliminar_cliente(?)', [id]);
         return rows;
     }
+    static async obtenerClientePorId(id: number) {
+    const [rows]: any = await pool.query('SELECT * FROM verClientes WHERE id = ?', [id]);
+    const cliente = rows[0];
+    if (!cliente) return null;
+
+    // FIX: se agrega el JOIN a asesores para traer el nombre junto con sus marcas asignadas
+    const [relaciones]: any = await pool.query(
+        `SELECT 
+            ca.id_asesor, 
+            ca.asesor_tipo, 
+            ca.marcas_asignadas,
+            TRIM(CONCAT_WS(' ', a.Nombre, a.app, a.apm)) AS nombre_asesor
+         FROM cliente_asesor ca
+         LEFT JOIN asesores a ON ca.id_asesor = a.id
+         WHERE ca.id_cliente = ?`,
+        [id]
+    );
+
+    cliente.asesoresAsignados = relaciones.length > 0
+        ? relaciones.map((r: any) => ({
+            id_asesor: r.id_asesor.toString(),
+            nombre_asesor: r.nombre_asesor || 'Asesor sin nombre',
+            asesor_tipo: r.asesor_tipo,
+            marcasArray: (r.marcas_asignadas || '')
+                .split(',')
+                .map((m: string) => m.trim())
+                .filter((m: string) => m.length > 0),
+            marcas_asignadas: r.marcas_asignadas || ''
+        }))
+        : [{ id_asesor: '', nombre_asesor: '', asesor_tipo: '', marcasArray: [], marcas_asignadas: '' }];
+
+    return cliente;
+}
     static async buscaryfiltrarClientes(busqueda: string | null, estatus: number | null, pagina: number = 1, limite: number = 6) {
         const offset = (pagina - 1) * limite;
         const [rows]: any = await pool.query('CALL sp_buscar_clientes(?, ?, ?, ?)', [
@@ -183,17 +193,18 @@ export class ClienteService {
         }
     }
     static async asignarCredito(
-        id_cliente: number,
-        tiene_credito: boolean,
-        limite_credito: number
-    ): Promise<string> {
-        await pool.query(
-            'CALL sp_asignar_credito_cliente(?, ?, ?, @mensaje)',
-            [id_cliente, tiene_credito ? 1 : 0, limite_credito]
-        );
+    id_cliente: number,
+    tiene_credito: boolean,
+    limite_credito: number,
+    fecha_vencimiento: string | null 
+): Promise<string> {
+    await pool.query(
+        'CALL sp_asignar_credito_cliente(?, ?, ?, ?, @mensaje)',
+        [id_cliente, tiene_credito ? 1 : 0, limite_credito, fecha_vencimiento]
+    );
 
-        const [rows]: any = await pool.query('SELECT @mensaje AS mensaje');
+    const [rows]: any = await pool.query('SELECT @mensaje AS mensaje');
 
-        return rows[0].mensaje;
-    }
+    return rows[0].mensaje;
+}
 }

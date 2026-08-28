@@ -154,31 +154,26 @@ static async subirFactura(req: Request, res: Response) {
             return res.status(500).json({ error: 'Error interno al obtener los contadores de pedidos.' });
         }
     }
-    static async pagarConCredito(req: Request, res: Response) {
-        try {
-            const id_pedido = parseInt(req.params.id as string);
+ static async pagarConCredito(req: Request, res: Response) {
+    try {
+        const id_pedido = parseInt(req.params.id as string);
 
-            if (isNaN(id_pedido)) {
-                return res.status(400).json({ error: 'Se requiere un ID de pedido válido.' });
-            }
-
-            const mensaje = await PedidoService.pagarPedidoConCredito(id_pedido);
-
-            const mensajeMinusculas = mensaje.toLowerCase();
-            if (
-                mensajeMinusculas.includes('error') || 
-                mensajeMinusculas.includes('insuficiente') || 
-                mensajeMinusculas.includes('no tiene') ||
-                mensajeMinusculas.includes('procesado anteriormente')
-            ) {
-                return res.status(400).json({ error: mensaje });
-            }
-
-            return res.status(200).json({ mensaje: mensaje });
-
-        } catch (error: any) {
-            console.error('Error en el controlador al pagar pedido con crédito:', error);
-            return res.status(500).json({ error: 'Error interno del servidor al procesar el pago con crédito.' });
+        if (isNaN(id_pedido)) {
+            return res.status(400).json({ error: 'Se requiere un ID de pedido válido.' });
         }
+
+        const mensaje = await PedidoService.pagarPedidoConCredito(id_pedido);
+        const esExito = mensaje.toLowerCase().startsWith('cobro exitoso');
+
+        if (!esExito) {
+            return res.status(400).json({ error: mensaje });
+        }
+
+        return res.status(200).json({ mensaje: mensaje });
+
+    } catch (error: any) {
+        console.error('Error en el controlador al pagar pedido con crédito:', error);
+        return res.status(500).json({ error: 'Error interno del servidor al procesar el pago con crédito.' });
     }
+}
 }

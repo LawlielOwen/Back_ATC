@@ -331,38 +331,49 @@ export class ClienteController {
             return res.status(500).json({ error: 'Error interno del servidor al procesar la CSF.' });
         }
     }
-    static async asignarCredito(req: Request, res: Response) {
-        try {
-            const { id } = req.params;
-            const { tiene_credito, limite_credito } = req.body;
+ static async asignarCredito(req: Request, res: Response) {
+    try {
+        const { id } = req.params;
+        const { tiene_credito, limite_credito, fecha_vencimiento } = req.body;
 
-            if (tiene_credito === undefined || tiene_credito === null) {
-                return res.status(400).json({ error: 'El campo tiene_credito es obligatorio.' });
-            }
-
-            const limite = limite_credito !== undefined && limite_credito !== null
-                ? Number(limite_credito)
-                : 0;
-
-            if (isNaN(limite)) {
-                return res.status(400).json({ error: 'El límite de crédito debe ser un número válido.' });
-            }
-
-            const mensaje = await ClienteService.asignarCredito(
-                Number(id),
-                Boolean(tiene_credito),
-                limite
-            );
-
-            if (mensaje.toLowerCase().startsWith('error')) {
-                return res.status(400).json({ error: mensaje });
-            }
-
-            return res.status(200).json({ mensaje });
-
-        } catch (error) {
-            console.error('Error al asignar crédito:', error);
-            return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
+        if (tiene_credito === undefined || tiene_credito === null) {
+            return res.status(400).json({ error: 'El campo tiene_credito es obligatorio.' });
         }
+
+        const limite = limite_credito !== undefined && limite_credito !== null
+            ? Number(limite_credito)
+            : 0;
+
+        if (isNaN(limite)) {
+            return res.status(400).json({ error: 'El límite de crédito debe ser un número válido.' });
+        }
+
+        const tieneCreditoBool = Boolean(tiene_credito);
+
+        // NUEVO: si se autoriza crédito, la fecha es obligatoria desde este nivel también
+        // (el SP la vuelve a validar, pero así el error llega más rápido y más claro)
+        if (tieneCreditoBool && (!fecha_vencimiento || typeof fecha_vencimiento !== 'string')) {
+            return res.status(400).json({ error: 'Debe capturar una fecha de vencimiento para autorizar la línea de crédito.' });
+        }
+
+        const fechaVencimientoFinal = tieneCreditoBool ? fecha_vencimiento : null;
+
+        const mensaje = await ClienteService.asignarCredito(
+            Number(id),
+            tieneCreditoBool,
+            limite,
+            fechaVencimientoFinal
+        );
+
+        if (mensaje.toLowerCase().startsWith('error')) {
+            return res.status(400).json({ error: mensaje });
+        }
+
+        return res.status(200).json({ mensaje });
+
+    } catch (error) {
+        console.error('Error al asignar crédito:', error);
+        return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
     }
+}
 }

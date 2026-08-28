@@ -14,6 +14,7 @@ export interface Cliente {
     
     tiene_credito: number;
     limite_credito: number;
+    fecha_vencimiento_credito: string | null;   // NUEVO
     
     ids_asesores?: string;
     Nombres_asesores?: string;
@@ -21,6 +22,7 @@ export interface Cliente {
 
     asesoresAsignados?: {
         id_asesor: string;
+        nombre_asesor: string;        // NUEVO
         asesor_tipo: string;
         marcasArray: string[];
         marcas_asignadas: string;

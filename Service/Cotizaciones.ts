@@ -267,37 +267,38 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     .replace(/>/g, '&gt;');
             };
 
-            detalles.forEach((item: any, index: number) => {
-                const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
-                const precioUnitarioConvertido = precioTotalPartida / factorConversion;
+      detalles.forEach((item: any, index: number) => {
+    const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
+    const precioUnitarioConvertido = precioTotalPartida / factorConversion;
 
-                const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
+    const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
 
-                const origen = item.origen ? String(item.origen).trim() : '';
-                const esOrigenRojo = /reab|obsoleto/i.test(origen);
+    const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
+    const esOrigenRojo = /reab|obsoleto/i.test(origen);
 
-                const celdaExtra = origen
-                    ? `<div class="extra-desc-flex has-origen">
-                            <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
-                            <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
-                       </div>`
-                    : `<div class="extra-desc-flex">
-                            <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
-                       </div>`;
+    const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
 
-                filasHtml += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.cantidad_producto}</td>
-                    <!-- Usamos codigo_producto que trae el del catálogo o el manual -->
-                    <td>${item.codigo_producto}</td>
-                    <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
-                    <td class="text-left">${celdaExtra}</td>
-                    <td>${item.tiempo_entrega || 'INMEDIATO'}</td>
-                    <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-                    <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
-                </tr>`;
-            });
+    const celdaExtra = origen
+        ? `<div class="extra-desc-flex has-origen">
+                <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+                <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
+           </div>`
+        : `<div class="extra-desc-flex">
+                <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+           </div>`;
+
+    filasHtml += `
+    <tr>
+        <td>${index + 1}</td>
+        <td>${item.cantidad_producto}</td>
+        <td>${item.codigo_producto}</td>
+        <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
+        <td class="text-left">${celdaExtra}</td>
+        <td>${escapeHtml(tiempoEntrega)}</td>
+        <td>$${precioUnitarioConvertido.toFixed(2)}</td>
+        <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+    </tr>`;
+});
 
             const FILAS_MINIMAS = 6;
             for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
