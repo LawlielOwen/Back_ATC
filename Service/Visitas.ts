@@ -95,12 +95,11 @@ export class VisitaDemoService {
                 .replace(/>/g, '&gt;');
         };
 
-        // ⚠️ AJUSTA este mapeo según los valores reales que usan
-        // sp_completar_visita_demo / sp_cancelar_visita_demo para "estatus"
+ 
         const ESTATUS_MAP: Record<number, { texto: string; clase: string }> = {
-            0: { texto: 'PROGRAMADA', clase: 'programada' },
-            1: { texto: 'COMPLETADA', clase: 'completada' },
-            2: { texto: 'CANCELADA', clase: 'cancelada' }
+            1: { texto: 'PROGRAMADA', clase: 'programada' },
+            2: { texto: 'COMPLETADA', clase: 'completada' },
+            0: { texto: 'CANCELADA', clase: 'cancelada' }
         };
         const estatusInfo = ESTATUS_MAP[Number(visita.estatus)] ?? ESTATUS_MAP[0];
 

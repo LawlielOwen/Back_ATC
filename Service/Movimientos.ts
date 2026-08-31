@@ -16,13 +16,15 @@ export class MovimientoService {
         }
 
     }
-    static async registrarSalidaProducto(codigo: string, cantidad: number, destino: string, id_asesor: number, id_cliente: number) {
-        const [rows]: any = await pool.query('CALL sp_registrar_salida_producto(?, ?, ?, ?, ?)', [
+    static async registrarSalidaProducto(codigo: string, cantidad: number, destino: string, id_asesor: number | null,
+         id_cliente: number | null, clienteNoRegistrado: string | null) {
+        const [rows]: any = await pool.query('CALL sp_registrar_salida_producto(?, ?, ?, ?, ?, ?)', [
             codigo,
             cantidad,
             destino,
             id_asesor,
-            id_cliente
+            id_cliente,
+            clienteNoRegistrado
         ]);
         return rows;
     }

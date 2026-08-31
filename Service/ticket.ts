@@ -24,20 +24,22 @@ export class TicketService {
     }
 
 
-    static async modificarTicket(id_ticket: number, datos: any) {
+   static async modificarTicket(id_ticket: number, datos: any) {
         const connection = await pool.getConnection();
         try {
             const { 
-                id_asesor, id_cliente, nombre_prospecto, url_ticket, 
-                estatus, venta_exitosa, cliente_registrado, comentarios 
+                id_asesor, id_cliente, nombre_prospecto, url_ticket, comentarios 
             } = datos;
 
             await connection.query(
-                `CALL sp_modificar_ticket(?, ?, ?, ?, ?, ?, ?, ?, ?, @p_mensaje)`,
+                `CALL sp_modificar_ticket(?, ?, ?, ?, ?, ?, @p_mensaje)`,
                 [
-                    id_ticket, id_asesor, id_cliente || null, nombre_prospecto || null, 
-                    url_ticket || null, estatus, venta_exitosa ?? null, 
-                    cliente_registrado ?? 0, comentarios || null
+                    id_ticket, 
+                    id_asesor, 
+                    id_cliente || null, 
+                    nombre_prospecto || null, 
+                    url_ticket || null, 
+                    comentarios || null
                 ]
             );
 
