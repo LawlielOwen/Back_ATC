@@ -87,8 +87,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     try {
         await connection.beginTransaction();
 
-        await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+        await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
             id,
+            c.id_asesor || null,
             c.id_cliente || null,
             c.nombre_prospecto || null,
             c.contacto || null,
