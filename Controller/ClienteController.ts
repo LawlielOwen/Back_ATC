@@ -127,18 +127,20 @@ export class ClienteController {
     }
 
     static async buscaryfiltrarClientes(req: Request, res: Response) {
-        try {
-            const busqueda = req.query.busqueda as string || null;
-            const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : null;
-            const pagina = parseInt(req.query.pagina as string) || 1;
-            const limite = parseInt(req.query.limite as string) || 9;
-            const result = await ClienteService.buscaryfiltrarClientes(busqueda, estatus, pagina, limite);
-            res.status(200).json(result);
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
-        }
+    try {
+        const busqueda = req.query.busqueda as string || null;
+        const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : null;
+        const pagina = parseInt(req.query.pagina as string) || 1;
+        const limite = parseInt(req.query.limite as string) || 9;
+        const idAsesor = req.query.idAsesor ? parseInt(req.query.idAsesor as string) : null; // Se captura el ID
+
+        const result = await ClienteService.buscaryfiltrarClientes(busqueda, estatus, pagina, limite, idAsesor);
+        res.status(200).json(result);
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
+}
     static async procesarCSF(req: any, res: Response) {
         try {
             if (!req.file) {

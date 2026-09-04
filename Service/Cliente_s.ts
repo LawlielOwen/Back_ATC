@@ -77,23 +77,27 @@ export class ClienteService {
 
     return cliente;
 }
-    static async buscaryfiltrarClientes(busqueda: string | null, estatus: number | null, pagina: number = 1, limite: number = 6) {
-        const offset = (pagina - 1) * limite;
-        const [rows]: any = await pool.query('CALL sp_buscar_clientes(?, ?, ?, ?)', [
-            busqueda,
-            estatus,
-            limite,
-            offset
-        ]);
-        const clientes = rows[0];
-        const total = rows[1][0].total;
-        return {
-            clientes: clientes,
-            total: total,
-            paginas: Math.ceil(total / limite),
-            paginaActual: pagina
-        };
-    }
+  static async buscaryfiltrarClientes(busqueda: string | null, estatus: number | null, pagina: number = 1, limite: number = 6, idAsesor: number | null = null) {
+    const offset = (pagina - 1) * limite;
+    
+    const [rows]: any = await pool.query('CALL sp_buscar_clientes(?, ?, ?, ?, ?)', [
+        busqueda,
+        estatus,
+        limite,
+        offset,
+        idAsesor
+    ]);
+    
+    const clientes = rows[0];
+    const total = rows[1][0].total;
+    
+    return {
+        clientes: clientes,
+        total: total,
+        paginas: Math.ceil(total / limite),
+        paginaActual: pagina
+    };
+}
     static async activarCliente(id: number) {
         const [rows]: any = await pool.query('call sp_activar_cliente(?)', [id]);
         return rows;
