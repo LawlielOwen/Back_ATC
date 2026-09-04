@@ -2,37 +2,42 @@ import pool from '../Config/db';
 import { Cliente } from '../Model/Cliente';
 export class ClienteService {
 
-    static async obtenerClientes(pagina: number = 1, limite: number = 6, idAsesorFiltro: number = 0) {
-        const offset = (pagina - 1) * limite;
+   static async obtenerClientes(pagina: number = 1, limite: number = 6, idAsesorFiltro: number = 0) {
+    const offset = (pagina - 1) * limite;
 
-        let queryDatos = 'SELECT * FROM verClientes';
-        let queryCount = 'SELECT COUNT(*) as total FROM verClientes';
+    let queryDatos = 'SELECT * FROM verClientes';
+    let queryCount = 'SELECT COUNT(*) as total FROM verClientes';
 
-        const paramsDatos: any[] = [];
-        const paramsCount: any[] = [];
+    const paramsDatos: any[] = [];
+    const paramsCount: any[] = [];
 
-        if (idAsesorFiltro > 0) {
-            queryDatos += ' WHERE id_asesor = ?';
-            queryCount += ' WHERE id_asesor = ?';
-            paramsDatos.push(idAsesorFiltro);
-            paramsCount.push(idAsesorFiltro);
-        }
-
-        queryDatos += ' LIMIT ? OFFSET ?';
-        paramsDatos.push(limite, offset);
-
-        const [rows]: any = await pool.query(queryDatos, paramsDatos);
-        const [totalRows]: any = await pool.query(queryCount, paramsCount);
-
-        const total = totalRows[0].total;
-
-        return {
-            clientes: rows,
-            total: total,
-            paginas: Math.ceil(total / limite),
-            paginaActual: pagina
-        };
+    if (idAsesorFiltro > 0) {
+        const filtroAsesor = ` WHERE EXISTS (
+            SELECT 1 FROM cliente_asesor ca 
+            WHERE ca.id_cliente = verClientes.id 
+              AND ca.id_asesor = ?
+        )`;
+        queryDatos += filtroAsesor;
+        queryCount += filtroAsesor;
+        paramsDatos.push(idAsesorFiltro);
+        paramsCount.push(idAsesorFiltro);
     }
+
+    queryDatos += ' ORDER BY id DESC LIMIT ? OFFSET ?';
+    paramsDatos.push(limite, offset);
+
+    const [rows]: any = await pool.query(queryDatos, paramsDatos);
+    const [totalRows]: any = await pool.query(queryCount, paramsCount);
+
+    const total = totalRows[0].total;
+
+    return {
+        clientes: rows,
+        total: total,
+        paginas: Math.ceil(total / limite),
+        paginaActual: pagina
+    };
+}
    
 
     static async eliminarCliente(id: number) {
