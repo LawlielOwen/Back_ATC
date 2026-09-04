@@ -169,19 +169,23 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         fechaFin: string | null,
         ordenTotal: string | null,
         pagina: number = 1,
-        limite: number = 10
+        limite: number = 10,
+        idAsesor: number,
+        rol: string
     ) {
 
         const offset = (pagina - 1) * limite;
 
-        const [rows]: any = await pool.query('CALL sp_buscar_filtrar_cotizaciones(?, ?, ?, ?, ?, ?, ?)', [
+        const [rows]: any = await pool.query('CALL sp_buscar_filtrar_cotizaciones(?, ?, ?, ?, ?, ?, ?, ?, ?)', [
             busqueda,
             estatus,
             fechaInicio,
             fechaFin,
             ordenTotal,
             limite,
-            offset
+            offset,
+            idAsesor,
+            rol
         ]);
 
         const cot = rows[0];
@@ -300,10 +304,18 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     </tr>`;
 });
 
-            const FILAS_MINIMAS = 6;
-            for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
-                filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-            }
+           const FILAS_MINIMAS = 6;
+const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
+
+for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
+    const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
+
+    const celdaTiempoEntrega = esUltimaFilaRelleno
+        ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
+        : `<td></td>`;
+
+    filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
+}
 
 
             const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');

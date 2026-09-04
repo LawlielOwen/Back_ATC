@@ -55,7 +55,7 @@ export class CotizacionController {
             res.status(500).json({ error: 'Error interno del servidor al modificar la cotización' });
         }
     }
-   static async convertirCotizacion(req: Request, res: Response) {
+     static async convertirCotizacion(req: Request, res: Response) {
         try {
             const idCotizacion = parseInt(req.params.id as string);
             const { orden_compra } = req.body;
@@ -65,6 +65,19 @@ export class CotizacionController {
             }
             if (!orden_compra || typeof orden_compra !== 'string') {
                 return res.status(400).json({ error: 'El número de orden de compra es obligatorio y debe ser una cadena de texto' });
+            }
+
+            const usuario = req.usuario;
+            const esCotizadorOAdmin = usuario?.Rol === 'Cotizador' || usuario?.Rol === 'Administrador';
+
+            if (!esCotizadorOAdmin) {
+                const cotizacionActual: any = await CotizacionService.obtenerCotizacionId(idCotizacion);
+                if (!cotizacionActual) {
+                    return res.status(404).json({ error: 'Cotización no encontrada' });
+                }
+                if (cotizacionActual.id_asesor !== usuario?.id) {
+                    return res.status(403).json({ error: 'No tienes permiso para aceptar esta cotización.' });
+                }
             }
 
             const resultado = await CotizacionService.convertirAPedido(idCotizacion, orden_compra);
@@ -82,6 +95,19 @@ export class CotizacionController {
     static async cancelarCot(req: Request, res: Response) {
         const id = parseInt(req.params.id as string);
         try {
+            const usuario = req.usuario;
+            const esCotizadorOAdmin = usuario?.Rol === 'Cotizador' || usuario?.Rol === 'Administrador';
+
+            if (!esCotizadorOAdmin) {
+                const cotizacionActual: any = await CotizacionService.obtenerCotizacionId(id);
+                if (!cotizacionActual) {
+                    return res.status(404).json({ error: 'Cotización no encontrada' });
+                }
+                if (cotizacionActual.id_asesor !== usuario?.id) {
+                    return res.status(403).json({ error: 'No tienes permiso para cancelar esta cotización.' });
+                }
+            }
+
             const result = await CotizacionService.cancelarCotizacion(id);
             res.status(200).json(result);
         } catch (error: any) {
@@ -126,7 +152,10 @@ static async buscaryfiltrar(req: Request, res: Response) {
             
             const ordenTotal = (req.query.ordenTotal as string) || null;            
             const pagina = parseInt(req.query.pagina as string) || 1;
-            const limite = parseInt(req.query.limite as string) || 9;          
+            const limite = parseInt(req.query.limite as string) || 9;
+
+            const idAsesor = req.usuario?.id as number;
+            const rol = req.usuario?.Rol as string;
             
             const result = await CotizacionService.BuscaryFiltrar(
                 busqueda, 
@@ -135,7 +164,9 @@ static async buscaryfiltrar(req: Request, res: Response) {
                 fechaFin, 
                 ordenTotal, 
                 pagina, 
-                limite
+                limite,
+                idAsesor,
+                rol
             );
             
             res.status(200).json(result);         

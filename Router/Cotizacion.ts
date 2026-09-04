@@ -1,6 +1,8 @@
 import {Router} from 'express';
 import {CotizacionController} from "../Controller/CotizacionController"
 import { CambioDivisaController } from '../Controller/cambioDivisa';
+import { verificarToken } from '../middleware/Auth.middleware '; 
+
 const router = Router();
 router.get('/tipo-cambio', CambioDivisaController.obtenerTipoCambio);
 router.get('/cotizaciones/mensual', CotizacionController.contarCot);
