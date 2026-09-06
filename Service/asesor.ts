@@ -159,4 +159,49 @@ export class AsesorService {
       connection.release();
     }
   }
+  static async actualizarConsecutivo(idAsesor: number, nuevoConsecutivo: number) {
+        const [result]: any = await pool.query(
+            'UPDATE asesores SET consecutivo_cotizacion = ? WHERE id = ?',
+            [nuevoConsecutivo, idAsesor]
+        );
+        return result.affectedRows > 0;
+    }
+ static async verificarFolioExistente(idAsesor: number, numeroCandidato: number) {
+    const [asesorRows]: any = await pool.query(
+      'SELECT Nombre, app FROM asesores WHERE id = ?',
+      [idAsesor]
+    );
+
+    if (asesorRows.length === 0) {
+      throw new Error('El asesor especificado no existe.');
+    }
+
+    const asesor = asesorRows[0];
+    const nombre = (asesor.Nombre || '').trim().charAt(0).toUpperCase() || 'X';
+    const apellido = (asesor.app || '').trim().charAt(0).toUpperCase() || 'X';
+    const iniciales = `${nombre}${apellido}`;
+
+    const numeroFormateado = numeroCandidato < 1000
+      ? String(numeroCandidato).padStart(3, '0')
+      : String(numeroCandidato);
+
+    const folioCandidato = `${iniciales}-${numeroFormateado}`;
+
+    // Solo se compara dentro del año en curso, no contra todo el historial
+    const [rows]: any = await pool.query(
+      `SELECT id, fecha, Estatus 
+       FROM cotizaciones 
+       WHERE id_asesor = ? 
+         AND num_cotizacion = ? 
+         AND YEAR(fecha) = YEAR(CURDATE())
+       LIMIT 1`,
+      [idAsesor, folioCandidato]
+    );
+
+    return {
+      folio: folioCandidato,
+      existe: rows.length > 0,
+      cotizacionExistente: rows.length > 0 ? rows[0] : null
+    };
+}
 }

@@ -19,5 +19,6 @@ router.get('/asesores/count', verificarRol('Administrador'), AsesorController.co
 router.post('/asesores', verificarRol('Administrador'), AsesorController.addAsesor);
 router.put('/asesores/:id', verificarRol('Administrador'), AsesorController.updateAsesor);
 router.delete('/asesores/:id', verificarRol('Administrador'), AsesorController.deleteAsesor);
-
+router.put('/asesores/:id/consecutivo', verificarToken, AsesorController.actualizarConsecutivo);
+router.get('/asesores/:id/verificar-folio', verificarToken, AsesorController.verificarFolio);
 export default router;

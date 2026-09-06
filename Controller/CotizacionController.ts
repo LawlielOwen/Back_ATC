@@ -13,30 +13,31 @@ export class CotizacionController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-   static async crearCotizacion(req: Request, res: Response) {
-        try {
-            const cotizacionData = req.body;
+  static async crearCotizacion(req: Request, res: Response) {
+    try {
+        const cotizacionData = req.body;
 
-            if (!cotizacionData.id_asesor) {
-                return res.status(400).json({ error: 'El ID del asesor es obligatorio para generar la cotización.' });
-            }
-
-            if (!cotizacionData.detalles || cotizacionData.detalles.length === 0) {
-                return res.status(400).json({ error: 'La cotización debe tener al menos un producto.' });
-            }
-
-            const idNuevaCotizacion = await CotizacionService.guardarCotizacion(cotizacionData);
-            
-            res.status(200).json({
-                mensaje: 'Cotización guardada con éxito',
-                id_cotizacion: idNuevaCotizacion
-            });
-
-        } catch (error: any) {
-            console.error('Error al crear la cotización:', error);
-            res.status(500).json({ error: 'Error interno del servidor al guardar la cotización' });
+        if (!cotizacionData.id_asesor) {
+            return res.status(400).json({ error: 'El ID del asesor es obligatorio para generar la cotización.' });
         }
+
+        if (!cotizacionData.detalles || cotizacionData.detalles.length === 0) {
+            return res.status(400).json({ error: 'La cotización debe tener al menos un producto.' });
+        }
+
+        const resultado = await CotizacionService.guardarCotizacion(cotizacionData);
+
+        res.status(200).json({
+            mensaje: 'Cotización guardada con éxito',
+            id_cotizacion: resultado.id,
+            num_cotizacion: resultado.num_cotizacion
+        });
+
+    } catch (error: any) {
+        console.error('Error al crear la cotización:', error);
+        res.status(500).json({ error: 'Error interno del servidor al guardar la cotización' });
     }
+}
     static async modificarCotizacion(req: Request, res: Response) {
         try {
             const idCotizacion = parseInt(req.params.id as string);
@@ -229,4 +230,5 @@ static async vincularCliente(req: any, res: any) {
             return res.status(500).json({ error: 'Error interno del servidor al vincular el cliente.' });
         }
     }
+    
 }

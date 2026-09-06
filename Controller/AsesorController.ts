@@ -109,4 +109,41 @@ export class AsesorController {
       res.status(400).json({ error: error.message || 'Error al intentar el registro' });
     }
   }
+  static async actualizarConsecutivo(req: Request, res: Response) {
+        try {
+            const idAsesor = parseInt(req.params.id as string);
+            const consecutivo = parseInt(req.body.consecutivo);
+
+            if (isNaN(idAsesor) || isNaN(consecutivo) || consecutivo < 1) {
+                return res.status(400).json({ error: 'ID de asesor y un consecutivo válido son requeridos.' });
+            }
+
+            const actualizado = await AsesorService.actualizarConsecutivo(idAsesor, consecutivo);
+
+            if (actualizado) {
+                return res.status(200).json({ mensaje: 'Folio consecutivo actualizado correctamente.' });
+            } else {
+                return res.status(404).json({ error: 'Asesor no encontrado.' });
+            }
+        } catch (error: any) {AsesorService
+            console.error('Error al actualizar el consecutivo:', error);
+            return res.status(500).json({ error: 'Error interno del servidor.' });
+        }
+    }
+    static async verificarFolio(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string);
+      const numero = parseInt(req.query.numero as string);
+
+      if (isNaN(id) || isNaN(numero) || numero < 1) {
+        return res.status(400).json({ error: 'Parámetros inválidos.' });
+      }
+
+      const resultado = await AsesorService.verificarFolioExistente(id, numero);
+      res.status(200).json(resultado);
+    } catch (error: any) {
+      console.error('Error al verificar folio:', error);
+      res.status(500).json({ error: error.message || 'Error interno del servidor' });
+    }
+}
 }

@@ -23,65 +23,64 @@ export class CotizacionService {
             paginaActual: pagina
         };
     }
-    static async guardarCotizacion(c: any): Promise<number> {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
+   static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: string }> {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-            await connection.query('CALL sp_guardar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @nuevo_id)', [
-                c.id_asesor,
-                c.id_cliente || null,
-                c.nombre_prospecto || null,
-                c.contacto || null,
-                c.ciudad_destino || null,
-                c.moneda || 'MONEDA NACIONAL',
-                c.tipo_cambio,
-                c.vigencia_dias || 15,
-                c.subtotal,
-                c.iva,
-                c.total
-            ]);
+        await connection.query('CALL sp_guardar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @nuevo_id, @nuevo_folio)', [
+            c.id_asesor,
+            c.id_cliente || null,
+            c.nombre_prospecto || null,
+            c.contacto || null,
+            c.ciudad_destino || null,
+            c.moneda || 'MONEDA NACIONAL',
+            c.tipo_cambio,
+            c.vigencia_dias || 15,
+            c.subtotal,
+            c.iva,
+            c.total
+        ]);
 
-            const [rows]: any = await connection.query('SELECT @nuevo_id AS id_cotizacion');
-            const idCotizacion = rows[0].id_cotizacion;
+        const [rows]: any = await connection.query('SELECT @nuevo_id AS id_cotizacion, @nuevo_folio AS num_cotizacion');
+        const idCotizacion = rows[0].id_cotizacion;
+        const numCotizacion = rows[0].num_cotizacion;
 
-            if (c.detalles && c.detalles.length > 0) {
-                for (const item of c.detalles) {
-
-                    await connection.query(
-                        `INSERT INTO detalles_cotizacion 
-(id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [
-                            idCotizacion,
-                            item.id_producto || null,
-                            item.codigo_manual || null,
-                            item.descripcion_manual || null,
-                            item.extra_descripcion_manual || null,
-                            item.cantidad_producto,
-                            item.origen || null,
-                            item.tiempo_entrega || 'INMEDIATO',
-                            item.precio_unitario_cotizado,
-                            item.tipo_flete || 'FIJO',
-                            item.valor_flete || 0,
-                            item.moneda_flete || 'MXN',
-                            item.costo_flete || 0
-                        ]
-                    );
-
-                }
+        if (c.detalles && c.detalles.length > 0) {
+            for (const item of c.detalles) {
+                await connection.query(
+                    `INSERT INTO detalles_cotizacion 
+                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        idCotizacion,
+                        item.id_producto || null,
+                        item.codigo_manual || null,
+                        item.descripcion_manual || null,
+                        item.extra_descripcion_manual || null,
+                        item.cantidad_producto,
+                        item.origen || null,
+                        item.tiempo_entrega || 'INMEDIATO',
+                        item.precio_unitario_cotizado,
+                        item.tipo_flete || 'FIJO',
+                        item.valor_flete || 0,
+                        item.moneda_flete || 'MXN',
+                        item.costo_flete || 0
+                    ]
+                );
             }
-
-            await connection.commit();
-            return idCotizacion;
-
-        } catch (error: any) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
         }
+
+        await connection.commit();
+        return { id: idCotizacion, num_cotizacion: numCotizacion };
+
+    } catch (error: any) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
+}
    static async modificarCotizacion(id: number, c: any) {
     const connection = await pool.getConnection();
     try {
@@ -405,4 +404,5 @@ for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
             connection.release();
         }
     }
+    
 }

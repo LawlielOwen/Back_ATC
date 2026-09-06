@@ -2,9 +2,121 @@ import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
 import fs from 'fs'; // Asegúrate de importar fs
 import path from 'path';
-const { leerPdfSat } = require('./pdfHelper.js');
+const { leerPdfSatEstructurado } = require('./pdfHelper.js');
 // Importación limpia, ahora sí permitida por el tsconfig
 import pdfParse = require('pdf-parse');
+function extraerRegimenPorTextoPlano(textoLimpio: string): string {
+    const regexBloque = /Reg[ií]menes?:\s*(?:R[eé]gimen\s*Fecha\s*Inicio\s*Fecha\s*Fin\s*)?([\s\S]*?)(?:Obligaciones:|$)/i;
+    const matchBloque = textoLimpio.match(regexBloque);
+
+    if (matchBloque && matchBloque[1]) {
+        const matchNombre = matchBloque[1].match(/^(.*?)\s*\d{2}\/\d{2}\/\d{4}/);
+        if (matchNombre && matchNombre[1].trim()) return matchNombre[1].trim();
+    }
+
+    // Última red de seguridad: el regex original (formato viejo, sin tabla de fechas)
+    const regexViejo = /(?:R[eé]gimen|R[eé]gimenes):?[\s\S]*?(?=\n|$|Obligaciones)/i;
+    const matchViejo = textoLimpio.match(regexViejo);
+    return matchViejo ? matchViejo[0].replace(/^Reg[ií]menes?:?\s*/i, '').trim() : '';
+}
+function extraerTablaRegimenes(itemsPorPagina: any[]): { nombre: string; fechaInicio: string; fechaFin: string } | null {
+    const items = itemsPorPagina.flat();
+    const normalizar = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+    // 1. Ubicamos dónde empieza la sección "Regímenes"
+    const idxInicioSeccion = items.findIndex((it: any) =>
+        /Reg[ií]menes?:?/i.test(normalizar(it.str))
+    );
+    if (idxInicioSeccion === -1) return null;
+
+    // 2. Ubicamos dónde termina (inicio de "Obligaciones")
+    let idxFinSeccion = items.findIndex((it: any, i: number) =>
+        i > idxInicioSeccion && /Obligaciones:?/i.test(normalizar(it.str))
+    );
+    if (idxFinSeccion === -1) idxFinSeccion = items.length;
+
+    const itemsSeccion = items.slice(idxInicioSeccion + 1, idxFinSeccion);
+    if (itemsSeccion.length === 0) return null;
+
+    // 3. Agrupamos por Y: todo lo que comparte (casi) la misma altura es la misma fila
+    const TOLERANCIA_Y = 3;
+    const filas: any[][] = [];
+    let filaActual: any[] = [];
+    let yFilaActual: number | null = null;
+
+    for (const it of itemsSeccion) {
+        if (yFilaActual === null || Math.abs(it.y - yFilaActual) <= TOLERANCIA_Y) {
+            filaActual.push(it);
+            if (yFilaActual === null) yFilaActual = it.y;
+        } else {
+            filas.push(filaActual);
+            filaActual = [it];
+            yFilaActual = it.y;
+        }
+    }
+    if (filaActual.length > 0) filas.push(filaActual);
+
+    // 4. Buscamos la fila de encabezado real: la que contiene "Fecha", "Inicio" y "Fin"
+    //    (no asumimos que sea la primera fila, por si el SAT mete texto antes)
+    const idxFilaEncabezado = filas.findIndex((fila) => {
+        const texto = fila.map((it) => it.str).join(' ');
+        return /Fecha/i.test(texto) && /Inicio/i.test(texto) && /Fin/i.test(texto);
+    });
+    if (idxFilaEncabezado === -1) return null;
+
+    const filaEncabezado = filas[idxFilaEncabezado];
+
+    // Localizamos las apariciones de "Fecha" en el encabezado para saber
+    // dónde arranca cada columna (Fecha Inicio / Fecha Fin), sin importar
+    // si vienen como un solo fragmento ("Fecha Inicio") o separados.
+    const itemsFecha = filaEncabezado.filter((it: any) => /Fecha/i.test(it.str));
+    if (itemsFecha.length < 2) return null;
+
+    const xColumnaFechaInicio = itemsFecha[0].x;
+    const xColumnaFechaFin = itemsFecha[1].x;
+
+    // 5. Procesamos las filas de datos (todo lo que viene después del encabezado)
+    const filasDatos = filas.slice(idxFilaEncabezado + 1);
+
+    const registros = filasDatos.map((fila) => {
+        const colNombre = fila.filter((it: any) => it.x < xColumnaFechaInicio - 2).map((it: any) => it.str);
+        const colFechaInicio = fila.filter((it: any) => it.x >= xColumnaFechaInicio - 2 && it.x < xColumnaFechaFin - 2).map((it: any) => it.str);
+        const colFechaFin = fila.filter((it: any) => it.x >= xColumnaFechaFin - 2).map((it: any) => it.str);
+
+        return {
+            nombre: normalizar(colNombre.join(' ')),
+            fechaInicio: normalizar(colFechaInicio.join(' ')),
+            fechaFin: normalizar(colFechaFin.join(' '))
+        };
+    }).filter((r) => r.nombre.length > 0);
+
+    if (registros.length === 0) return null;
+
+
+    const regexFecha = /\d{2}\/\d{2}\/\d{4}/;
+    const registrosUnificados: any[] = [];
+    for (const reg of registros) {
+        const esContinuacion = !regexFecha.test(reg.fechaInicio) && registrosUnificados.length > 0;
+        if (esContinuacion) {
+            const anterior = registrosUnificados[registrosUnificados.length - 1];
+            anterior.nombre = normalizar(`${anterior.nombre} ${reg.nombre}`);
+        } else {
+            registrosUnificados.push(reg);
+        }
+    }
+
+
+    const vigente = registrosUnificados.find((r) => !regexFecha.test(r.fechaFin));
+    if (vigente) return vigente;
+
+    const parsearFecha = (str: string) => {
+        const m = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (!m) return 0;
+        return new Date(`${m[3]}-${m[2]}-${m[1]}`).getTime();
+    };
+    registrosUnificados.sort((a, b) => parsearFecha(b.fechaInicio) - parsearFecha(a.fechaInicio));
+    return registrosUnificados[0];
+}
 
 export class ClienteController {
     static async getClientes(req: Request, res: Response) {
@@ -141,13 +253,14 @@ export class ClienteController {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 }
+
     static async procesarCSF(req: any, res: Response) {
         try {
             if (!req.file) {
                 return res.status(400).json({ error: 'No se subió ningún archivo' });
             }
             const dataBuffer = req.file.buffer;
-            const textoPDF = await leerPdfSat(dataBuffer);
+            const { texto: textoPDF, itemsPorPagina } = await leerPdfSatEstructurado(dataBuffer);
 
             const textoLimpio = textoPDF.replace(/[\r\n"]+/g, ' ').replace(/\s{2,}/g, ' ');
 
@@ -156,7 +269,6 @@ export class ClienteController {
             const matchRFC = textoLimpio.match(regexRFC);
 
             // ── CÓDIGO POSTAL ─────────────────────────────────────────────────────
-
             const regexCP = /C[oó]digo\s*Postal\s*:?\s*(\d{5})/i;
             const matchCP = textoLimpio.match(regexCP);
 
@@ -186,7 +298,15 @@ export class ClienteController {
             }
 
             // ── RÉGIMEN FISCAL ────────────────────────────────────────────────────
-            const regexRegimen = /(?:R[eé]gimen|R[eé]gimenes):?[\s\S]*?(?=\n|$|Fecha|Obligaciones)/i; const matchRegimen = textoLimpio.match(regexRegimen);
+            // Intento 1 (robusto): reconstrucción de la tabla por coordenadas
+            let nombreRegimenExtraido = '';
+            const registroRegimen = extraerTablaRegimenes(itemsPorPagina);
+            if (registroRegimen && registroRegimen.nombre) {
+                nombreRegimenExtraido = registroRegimen.nombre;
+            } else {
+                // Intento 2 (fallback): regex sobre el texto plano
+                nombreRegimenExtraido = extraerRegimenPorTextoPlano(textoLimpio);
+            }
 
             const mapaRegimenes: Record<string, string> = {
                 'general de ley personas morales': '601',
@@ -198,10 +318,10 @@ export class ClienteController {
                 'incorporación fiscal': '621',
                 'simplificado de confianza': '626',
             };
-            let codigoRegimen = '';
-            if (matchRegimen && matchRegimen[0]) {
-                const fragmentoRegimen = matchRegimen[0].toLowerCase();
 
+            let codigoRegimen = '';
+            if (nombreRegimenExtraido) {
+                const fragmentoRegimen = nombreRegimenExtraido.toLowerCase();
                 for (const [clave, codigo] of Object.entries(mapaRegimenes)) {
                     if (fragmentoRegimen.includes(clave)) {
                         codigoRegimen = codigo;
@@ -209,10 +329,14 @@ export class ClienteController {
                     }
                 }
             }
+
+            if (!codigoRegimen) {
+                console.warn('[CSF] No se pudo mapear el régimen fiscal. Texto detectado:', nombreRegimenExtraido || '(vacío)');
+            }
+
             // ── DIRECCIÓN ─────────────────────────────────────────────────────────
             const formatearTexto = (texto: string) => {
                 if (!texto) return '';
-
 
                 let textoSeparado = texto
                     .replace(/([a-zA-Z])(\d)/g, '$1 $2')
@@ -220,7 +344,6 @@ export class ClienteController {
                     .replace(/([a-z])([A-Z])/g, '$1 $2');
 
                 return textoSeparado.replace(/\w\S*/g, (palabra) => {
-
                     const particulas = ['de', 'del', 'la', 'las', 'el', 'los', 'y', 'en', 'col', 'num', 'ext', 'int'];
                     const palabraMin = palabra.toLowerCase();
 
@@ -378,4 +501,5 @@ export class ClienteController {
         return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
     }
 }
+
 }
