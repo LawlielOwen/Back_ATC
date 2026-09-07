@@ -24,7 +24,6 @@ export class AsesorController {
     try {
       const asesor = req.body;
       const result = await AsesorService.agregarAsesor(asesor);
-      
       res.status(201).json(result);
     } catch (error: any) {
       console.error('Error al agregar asesor:', error.message);
@@ -36,7 +35,7 @@ export class AsesorController {
     try {
       const id = parseInt(req.params.id as string);
       const asesor = req.body;
-      
+
       if (isNaN(id)) {
         return res.status(400).json({ error: 'ID de asesor inválido' });
       }
@@ -52,7 +51,7 @@ export class AsesorController {
   static async deleteAsesor(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
-      
+
       if (isNaN(id)) {
         return res.status(400).json({ error: 'ID de asesor inválido' });
       }
@@ -74,7 +73,6 @@ export class AsesorController {
       const estatus = req.query.estatus !== undefined ? Number(req.query.estatus) : -1;
 
       const resultado = await AsesorService.buscarAsesores(busqueda, estatus, limite, offset);
-
       const totalPaginas = Math.ceil(resultado.total / limite);
 
       res.status(200).json({
@@ -88,62 +86,72 @@ export class AsesorController {
       res.status(500).json({ error: 'Error interno en el servidor al buscar asesores' });
     }
   }
+
   static async countAsesoresActivos(req: Request, res: Response) {
     try {
       const total = await AsesorService.cantidadAsesoresActivos();
-      
       res.status(200).json({ total: total });
     } catch (error: any) {
       console.error('Error al contar asesores activos:', error);
       res.status(500).json({ error: 'Error interno en el servidor al contar asesores' });
     }
   }
-  static async registroAsesor (req: Request, res: Response) {
+
+  static async registroAsesor(req: Request, res: Response) {
     try {
       const asesor = req.body;
       const result = await AsesorService.registroAsesor(asesor);
-      
       res.status(201).json(result);
     } catch (error: any) {
       console.error('Error en el registro:', error.message);
       res.status(400).json({ error: error.message || 'Error al intentar el registro' });
     }
   }
-  static async actualizarConsecutivo(req: Request, res: Response) {
-        try {
-            const idAsesor = parseInt(req.params.id as string);
-            const consecutivo = parseInt(req.body.consecutivo);
 
-            if (isNaN(idAsesor) || isNaN(consecutivo) || consecutivo < 1) {
-                return res.status(400).json({ error: 'ID de asesor y un consecutivo válido son requeridos.' });
-            }
-
-            const actualizado = await AsesorService.actualizarConsecutivo(idAsesor, consecutivo);
-
-            if (actualizado) {
-                return res.status(200).json({ mensaje: 'Folio consecutivo actualizado correctamente.' });
-            } else {
-                return res.status(404).json({ error: 'Asesor no encontrado.' });
-            }
-        } catch (error: any) {AsesorService
-            console.error('Error al actualizar el consecutivo:', error);
-            return res.status(500).json({ error: 'Error interno del servidor.' });
-        }
-    }
-    static async verificarFolio(req: Request, res: Response) {
+  static async obtenerConsecutivoGlobal(req: Request, res: Response) {
     try {
-      const id = parseInt(req.params.id as string);
+      const consecutivo = await AsesorService.obtenerConsecutivoGlobal();
+      res.status(200).json({ consecutivo });
+    } catch (error: any) {
+      console.error('Error al obtener el consecutivo global:', error);
+      res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+  }
+
+  static async actualizarConsecutivoGlobal(req: Request, res: Response) {
+    try {
+      const consecutivo = parseInt(req.body.consecutivo);
+
+      if (isNaN(consecutivo) || consecutivo < 1) {
+        return res.status(400).json({ error: 'Un consecutivo válido mayor a 0 es requerido.' });
+      }
+
+      const actualizado = await AsesorService.actualizarConsecutivoGlobal(consecutivo);
+
+      if (actualizado) {
+        return res.status(200).json({ mensaje: 'Folio consecutivo global actualizado correctamente.' });
+      } else {
+        return res.status(404).json({ error: 'No se encontró el contador de folios.' });
+      }
+    } catch (error: any) {
+      console.error('Error al actualizar el consecutivo global:', error);
+      return res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+  }
+
+  static async verificarFolioGlobal(req: Request, res: Response) {
+    try {
       const numero = parseInt(req.query.numero as string);
 
-      if (isNaN(id) || isNaN(numero) || numero < 1) {
+      if (isNaN(numero) || numero < 1) {
         return res.status(400).json({ error: 'Parámetros inválidos.' });
       }
 
-      const resultado = await AsesorService.verificarFolioExistente(id, numero);
+      const resultado = await AsesorService.verificarFolioGlobalExistente(numero);
       res.status(200).json(resultado);
     } catch (error: any) {
       console.error('Error al verificar folio:', error);
       res.status(500).json({ error: error.message || 'Error interno del servidor' });
     }
-}
+  }
 }

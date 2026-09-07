@@ -159,49 +159,36 @@ export class AsesorService {
       connection.release();
     }
   }
-  static async actualizarConsecutivo(idAsesor: number, nuevoConsecutivo: number) {
-        const [result]: any = await pool.query(
-            'UPDATE asesores SET consecutivo_cotizacion = ? WHERE id = ?',
-            [nuevoConsecutivo, idAsesor]
-        );
-        return result.affectedRows > 0;
-    }
- static async verificarFolioExistente(idAsesor: number, numeroCandidato: number) {
-    const [asesorRows]: any = await pool.query(
-      'SELECT Nombre, app FROM asesores WHERE id = ?',
-      [idAsesor]
+ static async obtenerConsecutivoGlobal() {
+    const [rows]: any = await pool.query('SELECT consecutivo FROM consecutivo_folios WHERE id = 1');
+    return rows[0].consecutivo;
+}
+
+static async actualizarConsecutivoGlobal(nuevoConsecutivo: number) {
+    const [result]: any = await pool.query(
+        'UPDATE consecutivo_folios SET consecutivo = ? WHERE id = 1',
+        [nuevoConsecutivo]
     );
+    return result.affectedRows > 0;
+}
 
-    if (asesorRows.length === 0) {
-      throw new Error('El asesor especificado no existe.');
-    }
-
-    const asesor = asesorRows[0];
-    const nombre = (asesor.Nombre || '').trim().charAt(0).toUpperCase() || 'X';
-    const apellido = (asesor.app || '').trim().charAt(0).toUpperCase() || 'X';
-    const iniciales = `${nombre}${apellido}`;
-
+static async verificarFolioGlobalExistente(numeroCandidato: number) {
     const numeroFormateado = numeroCandidato < 1000
-      ? String(numeroCandidato).padStart(3, '0')
-      : String(numeroCandidato);
+        ? String(numeroCandidato).padStart(3, '0')
+        : String(numeroCandidato);
+    const folioCandidato = `C-${numeroFormateado}`;
 
-    const folioCandidato = `${iniciales}-${numeroFormateado}`;
-
-    // Solo se compara dentro del año en curso, no contra todo el historial
     const [rows]: any = await pool.query(
-      `SELECT id, fecha, Estatus 
-       FROM cotizaciones 
-       WHERE id_asesor = ? 
-         AND num_cotizacion = ? 
-         AND YEAR(fecha) = YEAR(CURDATE())
-       LIMIT 1`,
-      [idAsesor, folioCandidato]
+        `SELECT id, fecha, Estatus FROM cotizaciones 
+         WHERE num_cotizacion = ? AND YEAR(fecha) = YEAR(CURDATE()) 
+         LIMIT 1`,
+        [folioCandidato]
     );
 
     return {
-      folio: folioCandidato,
-      existe: rows.length > 0,
-      cotizacionExistente: rows.length > 0 ? rows[0] : null
+        folio: folioCandidato,
+        existe: rows.length > 0,
+        cotizacionExistente: rows.length > 0 ? rows[0] : null
     };
 }
 }
