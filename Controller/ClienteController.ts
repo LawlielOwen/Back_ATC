@@ -390,9 +390,19 @@ export class ClienteController {
                 nombre_constancia: req.file.originalname
             });
 
-        } catch (error) {
+               } catch (error: any) {
             console.error("Error al procesar el PDF:", error);
-            return res.status(500).json({ error: 'El documento parece ser un escaneo. Por favor, sube el PDF original o utiliza el Registro Manual.' });
+           
+            const esProblemaDeTexto = error?.message && (
+                /no text|empty|scan/i.test(error.message)
+            );
+            if (esProblemaDeTexto) {
+                return res.status(500).json({ error: 'El documento parece ser un escaneo. Por favor, sube el PDF original o utiliza el Registro Manual.' });
+            }
+            return res.status(500).json({
+                error: 'No se pudo procesar el documento.',
+                detalle: error?.message || 'Error desconocido'
+            });
         }
     }
     static async contarClientes(req: any, res: Response) {

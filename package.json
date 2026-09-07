@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-"scripts": {
+  "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn server.ts",
     "build": "tsc && copyfiles -u 0 assets/**/* Template/**/* dist/",
@@ -27,7 +27,7 @@
     "mysql2": "^3.22.3",
     "node-cron": "^4.2.1",
     "pdf-extraction": "^1.0.2",
-    "pdfjs-dist": "^2.16.105",
+    "pdfjs-dist": "3.11.174",
     "pdfreader": "^3.0.8",
     "puppeteer": "^25.1.0",
     "socket.io": "^4.8.3"
