@@ -244,174 +244,193 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
         ]);
         return rows[0];
     }
-   static async generarPDFCotizacion(id_cotizacion: number) {
-        const connection = await pool.getConnection();
-        try {
-            const [cotizaciones]: any = await connection.query(`
-                SELECT c.*, 
-                       -- COALESCE para priorizar los datos del cliente registrado sobre los manuales
-                       COALESCE(cl.Nombre, c.nombre_prospecto) AS nombre_cliente_final,
-                       COALESCE(cl.Direccion, c.direccion) AS direccion_final,
-                       COALESCE(cl.nombre_contacto, c.nombre_contacto) AS contacto_final, 
-                       COALESCE(cl.contacto_principal, c.contacto) AS telfax_cliente_final,
-                       COALESCE(cl.correo_contacto, c.correo) AS email_cliente_final,
-                       
-                       CONCAT(a.Nombre, ' ', a.app) AS nombre_asesor,
-                       a.telefono AS tel_asesor
-                FROM cotizaciones c
-                LEFT JOIN clientes cl ON c.id_cliente = cl.id
-                LEFT JOIN asesores a ON c.id_asesor = a.id
-                WHERE c.id = ?
-            `, [id_cotizacion]);
+ static async generarPDFCotizacion(id_cotizacion: number) {
+    const connection = await pool.getConnection();
+    try {
+        const [cotizaciones]: any = await connection.query(`
+            SELECT c.*, 
+                   COALESCE(cl.Nombre, c.nombre_prospecto) AS nombre_cliente_final,
+                   COALESCE(cl.Direccion, c.direccion) AS direccion_final,
+                   COALESCE(cl.nombre_contacto, c.nombre_contacto) AS contacto_final, 
+                   COALESCE(cl.contacto_principal, c.contacto) AS telfax_cliente_final,
+                   COALESCE(cl.correo_contacto, c.correo) AS email_cliente_final,
+                   
+                   CONCAT(a.Nombre, ' ', a.app) AS nombre_asesor,
+                   a.telefono AS tel_asesor
+            FROM cotizaciones c
+            LEFT JOIN clientes cl ON c.id_cliente = cl.id
+            LEFT JOIN asesores a ON c.id_asesor = a.id
+            WHERE c.id = ?
+        `, [id_cotizacion]);
 
-            if (cotizaciones.length === 0) throw new Error('Cotización no encontrada');
-            const cot = cotizaciones[0];
+        if (cotizaciones.length === 0) throw new Error('Cotización no encontrada');
+        const cot = cotizaciones[0];
 
-            // 2. Obtener las partidas (productos)
-            const [detalles]: any = await connection.query(`
-                SELECT *
-                FROM verDetallesCot
-                WHERE id_cotizacion = ?
-            `, [id_cotizacion]);
-            let filasHtml = '';
+        const [detalles]: any = await connection.query(`
+            SELECT *
+            FROM verDetallesCot
+            WHERE id_cotizacion = ?
+        `, [id_cotizacion]);
+        let filasHtml = '';
 
-            const esUSD = cot.moneda === 'USD';
-            const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
+        const esUSD = cot.moneda === 'USD';
+        const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
 
-            const escapeHtml = (str: any) => {
-                if (str === null || str === undefined) return '';
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
-            };
+        const escapeHtml = (str: any) => {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        };
 
-            detalles.forEach((item: any, index: number) => {
-                const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
-                const precioUnitarioConvertido = precioTotalPartida / factorConversion;
+        detalles.forEach((item: any, index: number) => {
+            const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
+            const precioUnitarioConvertido = precioTotalPartida / factorConversion;
+            const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
 
-                const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
+            const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
+            const esOrigenRojo = /reab|obsoleto/i.test(origen);
+            const tieneOrigen = origen !== '';
 
-                const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
-                const esOrigenRojo = /reab|obsoleto/i.test(origen);
+            const observacion = item.observaciones ? String(item.observaciones).trim() : '';
+            const tieneObservacion = observacion !== '';
 
-                const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
+            const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
 
-                // Incorporamos las observaciones si existen (con un salto de línea si ya hay extra descripción)
-                let descripcionCompleta = escapeHtml(item.extra_descripcion);
-                if (item.observaciones && item.observaciones.trim() !== '') {
-                    descripcionCompleta += descripcionCompleta ? `<br><span style="font-size: 0.9em; color: #555;"><i>Obs: ${escapeHtml(item.observaciones)}</i></span>` : `<span style="font-size: 0.9em; color: #555;"><i>Obs: ${escapeHtml(item.observaciones)}</i></span>`;
-                }
+            // ── Determina qué ocupa el slot derecho (donde normalmente va el ORIGEN) ──
+            let origenVaEnDescripcion = false;
+            let contenidoSlotDerecho = '';
 
-                const celdaExtra = origen
-                    ? `<div class="extra-desc-flex has-origen">
-                            <span class="extra-desc-text">${descripcionCompleta}</span>
-                            <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
-                       </div>`
-                    : `<div class="extra-desc-flex">
-                            <span class="extra-desc-text">${descripcionCompleta}</span>
-                       </div>`;
-
-                filasHtml += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.cantidad_producto}</td>
-                    <td>${item.codigo_producto}</td>
-                    <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
-                    <td class="text-left">${celdaExtra}</td>
-                    <td>${escapeHtml(tiempoEntrega)}</td>
-                    <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-                    <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
-                </tr>`;
-            });
-
-            const FILAS_MINIMAS = 6;
-            const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
-
-            for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
-                const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
-
-                const celdaTiempoEntrega = esUltimaFilaRelleno
-                    ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
-                    : `<td></td>`;
-
-                filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
+            if (tieneOrigen && tieneObservacion) {
+                // Ambos: el origen se desplaza a la columna DESCRIPCION,
+                // la observación toma el lugar del origen.
+                origenVaEnDescripcion = true;
+                contenidoSlotDerecho = `<span class="extra-desc-origen">${escapeHtml(observacion)}</span>`;
+            } else if (tieneOrigen) {
+                // Solo origen: comportamiento normal.
+                contenidoSlotDerecho = `<span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>`;
+            } else if (tieneObservacion) {
+                // Solo observación: toma el lugar del origen.
+                contenidoSlotDerecho = `<span class="extra-desc-origen">${escapeHtml(observacion)}</span>`;
             }
 
-            const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
-            const rutaLogo = path.join(__dirname, '../assets/logo_atc.png');
-            const rutaSMC = path.join(__dirname, '../assets/smc.png');
-            const rutaBanner = path.join(__dirname, '../assets/banner.png');
-            let htmlString = fs.readFileSync(rutaPlantilla, 'utf8');
+            const hayContenidoDerecho = contenidoSlotDerecho !== '';
 
-            const logoBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaLogo, 'base64');
-            const bannerBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaBanner, 'base64');
-            const smcBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaSMC, 'base64');
+            const celdaExtra = hayContenidoDerecho
+                ? `<div class="extra-desc-flex has-origen">
+                        <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+                        ${contenidoSlotDerecho}
+                   </div>`
+                : `<div class="extra-desc-flex">
+                        <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
+                   </div>`;
 
-            const htmlListo = htmlString
-                .replace(/{{logo_atc_base64}}/g, logoBase64)
-                .replace(/{{banner_marcas_base64}}/g, bannerBase64)
-                .replace(/{{smc_base64}}/g, smcBase64)
-                .replace(/{{num_cotizacion}}/g, cot.num_cotizacion || '')
-                .replace(/{{fecha}}/g, new Date(cot.fecha).toLocaleDateString('es-MX'))
-                .replace(/{{nombre_cliente}}/g, cot.nombre_cliente_final || '')
-                .replace(/{{direccion_cliente}}/g, cot.direccion_final || '')           // <-- Usa la nueva variable combinada
-                .replace(/{{contacto}}/g, cot.contacto_final || '')                     // <-- Usa la nueva variable combinada
-                .replace(/{{ciudad_destino}}/g, cot.ciudad_destino || '')
-                .replace(/{{email_cliente}}/g, cot.email_cliente_final || '')           // <-- Usa la nueva variable combinada
-                .replace(/{{telfax_cliente}}/g, cot.telfax_cliente_final || '')         // <-- Usa la nueva variable combinada
-                .replace(/{{tel_asesor}}/g, cot.tel_asesor || '')
-                .replace(/{{nombre_asesor}}/g, cot.nombre_asesor || '')
-                .replace(/{{filas_productos}}/g, filasHtml)
-                .replace(/{{vigencia_dias}}/g, cot.vigencia_dias || 15)
-                .replace(/{{subtotal}}/g, Number(cot.subtotal).toFixed(2))
-                .replace(/{{iva}}/g, Number(cot.iva).toFixed(2))
-                .replace(/{{total}}/g, Number(cot.total).toFixed(2))
-                .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
-                .replace(/{{texto_monto_letras}}/g, 'AQUÍ VA TU TEXTO EN LETRAS');
+            // ── DESCRIPCION: nombre del producto, + origen si se movió aquí ──
+            const descripcionCompleta = origenVaEnDescripcion
+                ? `<span style="font-weight:bold; color:${esOrigenRojo ? '#db1c1c' : '#000'};">${escapeHtml(origen)}</span>`
+                : escapeHtml(item.nombre_producto);
 
-            const browser = await puppeteer.launch({
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
-            });
+            filasHtml += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${item.cantidad_producto}</td>
+                <td>${item.codigo_producto || ''}</td>
+                <td class="text-left">${descripcionCompleta}</td>
+                <td class="text-left">${celdaExtra}</td>
+                <td>${escapeHtml(tiempoEntrega)}</td>
+                <td>$${precioUnitarioConvertido.toFixed(2)}</td>
+                <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+            </tr>`;
+        });
 
-            const page = await browser.newPage();
+        const FILAS_MINIMAS = 6;
+        const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
 
-            const DPI = 96;
-            const anchoHojaPulgadas = 11;
-            const altoHojaPulgadas = 8.5;
-            const margenPulgadas = 10 / 25.4;
+        for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
+            const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
 
-            const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
-            const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
+            const celdaTiempoEntrega = esUltimaFilaRelleno
+                ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
+                : `<td></td>`;
 
-            await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
-            await page.setContent(htmlListo, { waitUntil: 'load' });
-
-            const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
-
-            let escala = 1;
-            if (alturaContenidoPx > altoUtilPx) {
-                escala = altoUtilPx / alturaContenidoPx;
-                escala = Math.max(escala, 0.65);
-            }
-
-            const pdfBuffer = await page.pdf({
-                format: 'Letter',
-                printBackground: true,
-                landscape: true,
-                scale: escala,
-                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
-            });
-
-            await browser.close();
-            return pdfBuffer;
-
-        } finally {
-            connection.release();
+            filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
         }
+
+        const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
+        const rutaLogo = path.join(__dirname, '../assets/logo_atc.png');
+        const rutaSMC = path.join(__dirname, '../assets/smc.png');
+        const rutaBanner = path.join(__dirname, '../assets/banner.png');
+        let htmlString = fs.readFileSync(rutaPlantilla, 'utf8');
+
+        const logoBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaLogo, 'base64');
+        const bannerBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaBanner, 'base64');
+        const smcBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaSMC, 'base64');
+
+        const htmlListo = htmlString
+            .replace(/{{logo_atc_base64}}/g, logoBase64)
+            .replace(/{{banner_marcas_base64}}/g, bannerBase64)
+            .replace(/{{smc_base64}}/g, smcBase64)
+            .replace(/{{num_cotizacion}}/g, cot.num_cotizacion || '')
+            .replace(/{{fecha}}/g, new Date(cot.fecha).toLocaleDateString('es-MX'))
+            .replace(/{{nombre_cliente}}/g, cot.nombre_cliente_final || '')
+            .replace(/{{direccion_cliente}}/g, cot.direccion_final || '')
+            .replace(/{{contacto}}/g, cot.contacto_final || '')
+            .replace(/{{ciudad_destino}}/g, cot.ciudad_destino || '')
+            .replace(/{{email_cliente}}/g, cot.email_cliente_final || '')
+            .replace(/{{telfax_cliente}}/g, cot.telfax_cliente_final || '')
+            .replace(/{{tel_asesor}}/g, cot.tel_asesor || '')
+            .replace(/{{nombre_asesor}}/g, cot.nombre_asesor || '')
+            .replace(/{{filas_productos}}/g, filasHtml)
+            .replace(/{{vigencia_dias}}/g, cot.vigencia_dias || 15)
+            .replace(/{{subtotal}}/g, Number(cot.subtotal).toFixed(2))
+            .replace(/{{iva}}/g, Number(cot.iva).toFixed(2))
+            .replace(/{{total}}/g, Number(cot.total).toFixed(2))
+            .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
+            .replace(/{{texto_monto_letras}}/g, 'AQUÍ VA TU TEXTO EN LETRAS');
+
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
+        });
+
+        const page = await browser.newPage();
+
+        const DPI = 96;
+        const anchoHojaPulgadas = 11;
+        const altoHojaPulgadas = 8.5;
+        const margenPulgadas = 10 / 25.4;
+
+        const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
+        const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
+
+        await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
+        await page.setContent(htmlListo, { waitUntil: 'load' });
+
+        const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
+
+        let escala = 1;
+        if (alturaContenidoPx > altoUtilPx) {
+            escala = altoUtilPx / alturaContenidoPx;
+            escala = Math.max(escala, 0.65);
+        }
+
+        const pdfBuffer = await page.pdf({
+            format: 'Letter',
+            printBackground: true,
+            landscape: true,
+            scale: escala,
+            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
+        });
+
+        await browser.close();
+        return pdfBuffer;
+
+    } finally {
+        connection.release();
     }
+}
     static async vincularCliente(id_cotizacion: number, id_cliente: number) {
         const connection = await pool.getConnection();
         try {
