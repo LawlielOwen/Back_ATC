@@ -106,22 +106,27 @@ export class ClienteService {
         const [rows]: any = await pool.query('SELECT COUNT(*) AS total_activos FROM verClientes WHERE Estatus = 1;');
         return rows[0];
     }
-    static async agregarCliente(cliente: Cliente | any, asesoresAsignados: any[] = []) {
+  static async agregarCliente(cliente: any, asesoresAsignados: any[] = []) {
         const {
             Nombre, RFC, Razon_social, Regimen_fiscal, Direccion,
-            contacto_principal, correo_contacto, CP,
+            contacto_principal, nombre_contacto, correo_contacto, CP, 
             nombre_constancia, ruta_constancia,
-            tiene_credito, limite_credito
+            tiene_credito, limite_credito, fecha_vencimiento_credito  
         } = cliente;
 
+        const fechaVencimiento = (tiene_credito == 1 && fecha_vencimiento_credito) ? fecha_vencimiento_credito : null;
+
         const [resultSets]: any = await pool.query(
-            'call sp_agregar_cliente(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            'call sp_agregar_cliente(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', // 17 parámetros
             [
                 Nombre, RFC, Razon_social, Regimen_fiscal, Direccion,
-                contacto_principal, correo_contacto, CP,
+                contacto_principal, 
+                nombre_contacto || null, 
+                correo_contacto, CP,
                 nombre_constancia, ruta_constancia,
                 tiene_credito || 0,
                 limite_credito || 0.00,
+                fechaVencimiento, 
                 null, null, null
             ]
         );
@@ -133,7 +138,7 @@ export class ClienteService {
                 const marcas = Array.isArray(rel.marcasArray) ? rel.marcasArray.join(', ') : (rel.marcas_asignadas || '');
                 await pool.query(
                     `INSERT INTO cliente_asesor (id_cliente, id_asesor, asesor_tipo, marcas_asignadas)
-                 VALUES (?, ?, ?, ?)`,
+                     VALUES (?, ?, ?, ?)`,
                     [nuevoId, parseInt(rel.id_asesor), rel.asesor_tipo, marcas]
                 );
             }
@@ -142,26 +147,30 @@ export class ClienteService {
         return { id: nuevoId, mensaje: 'Cliente agregado correctamente' };
     }
 
-    static async actualizarCliente(id: number, cliente: Cliente | any, asesoresAsignados: any[] = []) {
+    static async actualizarCliente(id: number, cliente: any, asesoresAsignados: any[] = []) {
         const {
             Nombre, RFC, Razon_social, Regimen_fiscal, Direccion,
-            contacto_principal, correo_contacto, CP,
+            contacto_principal, nombre_contacto, correo_contacto, CP,
             nombre_constancia, ruta_constancia,
-            tiene_credito, limite_credito
+            tiene_credito, limite_credito, fecha_vencimiento_credito  
         } = cliente;
 
+        const fechaVencimiento = (tiene_credito == 1 && fecha_vencimiento_credito) ? fecha_vencimiento_credito : null;
+
         await pool.query(
-            'call sp_modificar_cliente(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            'call sp_modificar_cliente(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', 
             [
                 id, Nombre, RFC, Razon_social, Regimen_fiscal, Direccion,
-                contacto_principal, correo_contacto, CP,
+                contacto_principal, 
+                nombre_contacto || null, 
+                correo_contacto, CP,
                 nombre_constancia, ruta_constancia,
                 tiene_credito || 0,
                 limite_credito || 0.00,
+                fechaVencimiento,
                 null, null, null
             ]
         );
-
 
         await pool.query('DELETE FROM cliente_asesor WHERE id_cliente = ?', [id]);
 
@@ -170,7 +179,7 @@ export class ClienteService {
                 const marcas = Array.isArray(rel.marcasArray) ? rel.marcasArray.join(', ') : (rel.marcas_asignadas || '');
                 await pool.query(
                     `INSERT INTO cliente_asesor (id_cliente, id_asesor, asesor_tipo, marcas_asignadas)
-                 VALUES (?, ?, ?, ?)`,
+                     VALUES (?, ?, ?, ?)`,
                     [id, parseInt(rel.id_asesor), rel.asesor_tipo, marcas]
                 );
             }

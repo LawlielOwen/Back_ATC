@@ -5,6 +5,7 @@ export interface Cliente {
     Razon_social: string;
     Regimen_fiscal: string;
     Direccion: string;
+    nombre_contacto: string;
     contacto_principal: string;
     correo_contacto: string;
     CP: string;

@@ -23,16 +23,20 @@ export class CotizacionService {
             paginaActual: pagina
         };
     }
-   static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: string }> {
+static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: string }> {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        await connection.query('CALL sp_guardar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @nuevo_id, @nuevo_folio)', [
+        // Actualizado a 16 parámetros (incluyendo los @OUT)
+        await connection.query('CALL sp_guardar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @nuevo_id, @nuevo_folio)', [
             c.id_asesor,
             c.id_cliente || null,
             c.nombre_prospecto || null,
             c.contacto || null,
+            c.direccion || null,       // NUEVO
+            c.nombre_contacto || null, // NUEVO
+            c.correo || null,          // NUEVO
             c.ciudad_destino || null,
             c.moneda || 'MONEDA NACIONAL',
             c.tipo_cambio,
@@ -49,15 +53,17 @@ export class CotizacionService {
         if (c.detalles && c.detalles.length > 0) {
             for (const item of c.detalles) {
                 await connection.query(
+                    // Se agregó la columna "observaciones"
                     `INSERT INTO detalles_cotizacion 
-                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, observaciones, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // Ahora son 14 signos de interrogación
                     [
                         idCotizacion,
                         item.id_producto || null,
                         item.codigo_manual || null,
                         item.descripcion_manual || null,
                         item.extra_descripcion_manual || null,
+                        item.observaciones || null, // NUEVO
                         item.cantidad_producto,
                         item.origen || null,
                         item.tiempo_entrega || 'INMEDIATO',
@@ -81,17 +87,21 @@ export class CotizacionService {
         connection.release();
     }
 }
+
    static async modificarCotizacion(id: number, c: any) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+        // Actualizado a 14 parámetros exactos del SP
+        await connection.query('CALL sp_modificar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
             id,
-            c.id_asesor || null,
             c.id_cliente || null,
             c.nombre_prospecto || null,
             c.contacto || null,
+            c.direccion || null,       // NUEVO
+            c.nombre_contacto || null, // NUEVO
+            c.correo || null,          // NUEVO
             c.ciudad_destino || null,
             c.moneda || 'MONEDA NACIONAL',
             c.tipo_cambio,
@@ -102,19 +112,21 @@ export class CotizacionService {
         ]);
 
         await connection.query('DELETE FROM detalles_cotizacion WHERE id_cotizacion = ?', [id]);
+        
         if (c.detalles && c.detalles.length > 0) {
             for (const item of c.detalles) {
-
                 await connection.query(
+                    // Se agregó la columna "observaciones"
                     `INSERT INTO detalles_cotizacion 
-                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, observaciones, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // Ahora son 14 signos
                     [
                         id,
                         item.id_producto || null,
                         item.codigo_manual || null,
                         item.descripcion_manual || null,
                         item.extra_descripcion_manual || null,
+                        item.observaciones || null, // NUEVO
                         item.cantidad_producto,
                         item.origen || null,
                         item.tiempo_entrega || 'INMEDIATO',
@@ -232,15 +244,18 @@ export class CotizacionService {
         ]);
         return rows[0];
     }
-    static async generarPDFCotizacion(id_cotizacion: number) {
+   static async generarPDFCotizacion(id_cotizacion: number) {
         const connection = await pool.getConnection();
         try {
             const [cotizaciones]: any = await connection.query(`
                 SELECT c.*, 
+                       -- COALESCE para priorizar los datos del cliente registrado sobre los manuales
                        COALESCE(cl.Nombre, c.nombre_prospecto) AS nombre_cliente_final,
-                       cl.Direccion, 
-                       cl.contacto_principal AS telfax_cliente,
-                       cl.correo_contacto AS email_cliente,
+                       COALESCE(cl.Direccion, c.direccion) AS direccion_final,
+                       COALESCE(cl.nombre_contacto, c.nombre_contacto) AS contacto_final, 
+                       COALESCE(cl.contacto_principal, c.contacto) AS telfax_cliente_final,
+                       COALESCE(cl.correo_contacto, c.correo) AS email_cliente_final,
+                       
                        CONCAT(a.Nombre, ' ', a.app) AS nombre_asesor,
                        a.telefono AS tel_asesor
                 FROM cotizaciones c
@@ -271,52 +286,57 @@ export class CotizacionService {
                     .replace(/>/g, '&gt;');
             };
 
-      detalles.forEach((item: any, index: number) => {
-    const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
-    const precioUnitarioConvertido = precioTotalPartida / factorConversion;
+            detalles.forEach((item: any, index: number) => {
+                const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
+                const precioUnitarioConvertido = precioTotalPartida / factorConversion;
 
-    const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
+                const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
 
-    const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
-    const esOrigenRojo = /reab|obsoleto/i.test(origen);
+                const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
+                const esOrigenRojo = /reab|obsoleto/i.test(origen);
 
-    const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
+                const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
 
-    const celdaExtra = origen
-        ? `<div class="extra-desc-flex has-origen">
-                <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
-                <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
-           </div>`
-        : `<div class="extra-desc-flex">
-                <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
-           </div>`;
+                // Incorporamos las observaciones si existen (con un salto de línea si ya hay extra descripción)
+                let descripcionCompleta = escapeHtml(item.extra_descripcion);
+                if (item.observaciones && item.observaciones.trim() !== '') {
+                    descripcionCompleta += descripcionCompleta ? `<br><span style="font-size: 0.9em; color: #555;"><i>Obs: ${escapeHtml(item.observaciones)}</i></span>` : `<span style="font-size: 0.9em; color: #555;"><i>Obs: ${escapeHtml(item.observaciones)}</i></span>`;
+                }
 
-    filasHtml += `
-    <tr>
-        <td>${index + 1}</td>
-        <td>${item.cantidad_producto}</td>
-        <td>${item.codigo_producto}</td>
-        <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
-        <td class="text-left">${celdaExtra}</td>
-        <td>${escapeHtml(tiempoEntrega)}</td>
-        <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-        <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
-    </tr>`;
-});
+                const celdaExtra = origen
+                    ? `<div class="extra-desc-flex has-origen">
+                            <span class="extra-desc-text">${descripcionCompleta}</span>
+                            <span class="extra-desc-origen${esOrigenRojo ? ' origen-rojo' : ''}">${escapeHtml(origen)}</span>
+                       </div>`
+                    : `<div class="extra-desc-flex">
+                            <span class="extra-desc-text">${descripcionCompleta}</span>
+                       </div>`;
 
-           const FILAS_MINIMAS = 6;
-const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
+                filasHtml += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.cantidad_producto}</td>
+                    <td>${item.codigo_producto}</td>
+                    <td class="text-left">${escapeHtml(item.nombre_producto)}</td>
+                    <td class="text-left">${celdaExtra}</td>
+                    <td>${escapeHtml(tiempoEntrega)}</td>
+                    <td>$${precioUnitarioConvertido.toFixed(2)}</td>
+                    <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+                </tr>`;
+            });
 
-for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
-    const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
+            const FILAS_MINIMAS = 6;
+            const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
 
-    const celdaTiempoEntrega = esUltimaFilaRelleno
-        ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
-        : `<td></td>`;
+            for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
+                const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
 
-    filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
-}
+                const celdaTiempoEntrega = esUltimaFilaRelleno
+                    ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
+                    : `<td></td>`;
 
+                filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
+            }
 
             const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
             const rutaLogo = path.join(__dirname, '../assets/logo_atc.png');
@@ -335,11 +355,11 @@ for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
                 .replace(/{{num_cotizacion}}/g, cot.num_cotizacion || '')
                 .replace(/{{fecha}}/g, new Date(cot.fecha).toLocaleDateString('es-MX'))
                 .replace(/{{nombre_cliente}}/g, cot.nombre_cliente_final || '')
-                .replace(/{{direccion_cliente}}/g, cot.Direccion || '')
-                .replace(/{{contacto}}/g, cot.contacto || '')
+                .replace(/{{direccion_cliente}}/g, cot.direccion_final || '')           // <-- Usa la nueva variable combinada
+                .replace(/{{contacto}}/g, cot.contacto_final || '')                     // <-- Usa la nueva variable combinada
                 .replace(/{{ciudad_destino}}/g, cot.ciudad_destino || '')
-                .replace(/{{email_cliente}}/g, cot.email_cliente || '')
-                .replace(/{{telfax_cliente}}/g, cot.telfax_cliente || '')
+                .replace(/{{email_cliente}}/g, cot.email_cliente_final || '')           // <-- Usa la nueva variable combinada
+                .replace(/{{telfax_cliente}}/g, cot.telfax_cliente_final || '')         // <-- Usa la nueva variable combinada
                 .replace(/{{tel_asesor}}/g, cot.tel_asesor || '')
                 .replace(/{{nombre_asesor}}/g, cot.nombre_asesor || '')
                 .replace(/{{filas_productos}}/g, filasHtml)
