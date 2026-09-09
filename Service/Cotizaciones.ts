@@ -387,7 +387,8 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
             .replace(/{{iva}}/g, Number(cot.iva).toFixed(2))
             .replace(/{{total}}/g, Number(cot.total).toFixed(2))
             .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
-            .replace(/{{texto_monto_letras}}/g, 'AQUÍ VA TU TEXTO EN LETRAS');
+            .replace(/{{moneda_color_clase}}/g, cot.moneda === 'USD' ? 'moneda-usd' : 'moneda-mxn')
+            .replace(/{{texto_monto_letras}}/g, '');
 
         const browser = await puppeteer.launch({
             headless: true,

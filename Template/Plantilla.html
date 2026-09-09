@@ -289,11 +289,12 @@
             font-size: 10px; 
             line-height: 1.3; 
         }
-        .td-salvo-venta {
-    background-color: #FFFF00;
+.items-table td.td-salvo-venta {
+    background-color: #FFFF00 !important;
     font-weight: bold;
     text-align: center;
     font-size: 9px;
+    color: #000;
 }
 
         /* Fila de firmas y correos */
@@ -341,13 +342,19 @@
         .val-inner { display: flex; justify-content: space-between; width: 100%; padding: 3px 4px; box-sizing: border-box; }
 
         /* Caja verde militar de Moneda */
-        .box-green-currency { 
-            background-color: #92D050; 
+        /* Caja de Moneda: verde para MXN, amarilla para USD */
+        .box-currency { 
             text-align: right; 
             font-weight: bold; 
             font-size: 9px; 
             padding: 4px 6px; 
             margin-top: 15px; /* Para despegarla un poco de los totales */
+        }
+        .box-currency.moneda-mxn {
+            background-color: #92D050;
+        }
+        .box-currency.moneda-usd {
+            background-color: #FFFF00;
         }
         .font-bold { font-weight: bold; }
         /* ── CAJA DE TÉRMINOS Y CONDICIONES FINALES ── */
@@ -516,7 +523,7 @@
                 </tr>
             </table>
             
-            <div class="box-green-currency">
+            <div class="box-currency {{moneda_color_clase}}">
                 {{moneda_texto}}
             </div>
         </div>
