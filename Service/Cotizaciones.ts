@@ -244,7 +244,7 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
         ]);
         return rows[0];
     }
- static async generarPDFCotizacion(id_cotizacion: number) {
+static async generarPDFCotizacion(id_cotizacion: number) {
     const connection = await pool.getConnection();
     try {
         const [cotizaciones]: any = await connection.query(`
@@ -270,33 +270,57 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
             SELECT *
             FROM verDetallesCot
             WHERE id_cotizacion = ?
+            ORDER BY id_detalle
         `, [id_cotizacion]);
         let filasHtml = '';
+
+        // Formato visual: comas de miles y punto decimal para MXN y USD.
+        // Los cálculos siguen usando números; el símbolo $ ya está en la plantilla.
+        const formatoImporte = new Intl.NumberFormat('en-US', {
+            useGrouping: true,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        const formatearImporte = (valor: unknown): string => {
+            const numero = Number(valor);
+            if (!Number.isFinite(numero)) {
+                throw new Error('La cotización contiene un importe no válido');
+            }
+            return formatoImporte.format(numero);
+        };
 
         const esUSD = cot.moneda === 'USD';
         const factorConversion = (esUSD && cot.tipo_cambio > 0) ? Number(cot.tipo_cambio) : 1;
 
-        const escapeHtml = (str: any) => {
-            if (str === null || str === undefined) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+        // Conserva Unicode válido, incluidos ñ, acentos y símbolos técnicos.
+        const normalizarTextoPDF = (valor: unknown): string => {
+            if (valor === null || valor === undefined) return '';
+            return String(valor)
+                .normalize('NFC')
+                .replace(/\r\n?/g, '\n')
+                .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, ' ');
         };
+
+        const escapeHtml = (valor: unknown): string => normalizarTextoPDF(valor)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
 
         detalles.forEach((item: any, index: number) => {
             const precioTotalPartida = Number(item.precio_unitario_cotizado) + Number(item.costo_flete);
             const precioUnitarioConvertido = precioTotalPartida / factorConversion;
             const subtotalLineaConvertido = Number(item.subtotal_partida) / factorConversion;
 
-            const origen = item.origen ? String(item.origen).trim().toUpperCase() : '';
+            const origen = normalizarTextoPDF(item.origen).trim().toUpperCase();
             const esOrigenRojo = /reab|obsoleto/i.test(origen);
             const tieneOrigen = origen !== '';
 
-            const observacion = item.observaciones ? String(item.observaciones).trim() : '';
+            const observacion = normalizarTextoPDF(item.observaciones).trim();
             const tieneObservacion = observacion !== '';
 
-            const tiempoEntrega = (item.tiempo_entrega ? String(item.tiempo_entrega) : 'INMEDIATO').toUpperCase();
+            const tiempoEntrega = (normalizarTextoPDF(item.tiempo_entrega).trim() || 'INMEDIATO').toUpperCase();
 
             // ── Determina qué ocupa el slot derecho (donde normalmente va el ORIGEN) ──
             let origenVaEnDescripcion = false;
@@ -326,35 +350,28 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
                         <span class="extra-desc-text">${escapeHtml(item.extra_descripcion)}</span>
                    </div>`;
 
-            // ── DESCRIPCION: nombre del producto, + origen si se movió aquí ──
+            // Conserva la regla actual: si hay origen y observación, aquí se muestra el origen.
             const descripcionCompleta = origenVaEnDescripcion
                 ? `<span style="font-weight:bold; color:${esOrigenRojo ? '#db1c1c' : '#000'};">${escapeHtml(origen)}</span>`
                 : escapeHtml(item.nombre_producto);
 
             filasHtml += `
-            <tr>
+            <tr class="fila-producto">
                 <td>${index + 1}</td>
-                <td>${item.cantidad_producto}</td>
-                <td>${item.codigo_producto || ''}</td>
+                <td>${escapeHtml(item.cantidad_producto)}</td>
+                <td>${escapeHtml(item.codigo_producto)}</td>
                 <td class="text-left">${descripcionCompleta}</td>
                 <td class="text-left">${celdaExtra}</td>
                 <td>${escapeHtml(tiempoEntrega)}</td>
-                <td>$${precioUnitarioConvertido.toFixed(2)}</td>
-                <td class="font-bold">$${subtotalLineaConvertido.toFixed(2)}</td>
+                <td>$${formatearImporte(precioUnitarioConvertido)}</td>
+                <td class="font-bold">$${formatearImporte(subtotalLineaConvertido)}</td>
             </tr>`;
         });
 
+
         const FILAS_MINIMAS = 6;
-        const filasRellenoFaltantes = FILAS_MINIMAS - detalles.length;
-
-        for (let i = detalles.length; i < FILAS_MINIMAS; i++) {
-            const esUltimaFilaRelleno = (i === FILAS_MINIMAS - 1) && filasRellenoFaltantes > 0;
-
-            const celdaTiempoEntrega = esUltimaFilaRelleno
-                ? `<td class="td-salvo-venta">SALVO PREVIA VENTA</td>`
-                : `<td></td>`;
-
-            filasHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td>${celdaTiempoEntrega}<td></td><td></td></tr>`;
+        for (let i = detalles.length; i < FILAS_MINIMAS - 1; i++) {
+            filasHtml += '<tr class="fila-relleno"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
         }
 
         const rutaPlantilla = path.join(__dirname, '../Template/Plantilla.html');
@@ -367,28 +384,43 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
         const bannerBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaBanner, 'base64');
         const smcBase64 = 'data:image/png;base64,' + fs.readFileSync(rutaSMC, 'base64');
 
-        const htmlListo = htmlString
-            .replace(/{{logo_atc_base64}}/g, logoBase64)
-            .replace(/{{banner_marcas_base64}}/g, bannerBase64)
-            .replace(/{{smc_base64}}/g, smcBase64)
-            .replace(/{{num_cotizacion}}/g, cot.num_cotizacion || '')
-            .replace(/{{fecha}}/g, new Date(cot.fecha).toLocaleDateString('es-MX'))
-            .replace(/{{nombre_cliente}}/g, cot.nombre_cliente_final || '')
-            .replace(/{{direccion_cliente}}/g, cot.direccion_final || '')
-            .replace(/{{contacto}}/g, cot.contacto_final || '')
-            .replace(/{{ciudad_destino}}/g, cot.ciudad_destino || '')
-            .replace(/{{email_cliente}}/g, cot.email_cliente_final || '')
-            .replace(/{{telfax_cliente}}/g, cot.telfax_cliente_final || '')
-            .replace(/{{tel_asesor}}/g, cot.tel_asesor || '')
-            .replace(/{{nombre_asesor}}/g, cot.nombre_asesor || '')
-            .replace(/{{filas_productos}}/g, filasHtml)
-            .replace(/{{vigencia_dias}}/g, cot.vigencia_dias || 15)
-            .replace(/{{subtotal}}/g, Number(cot.subtotal).toFixed(2))
-            .replace(/{{iva}}/g, Number(cot.iva).toFixed(2))
-            .replace(/{{total}}/g, Number(cot.total).toFixed(2))
-            .replace(/{{moneda_texto}}/g, cot.moneda === 'USD' ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL')
-            .replace(/{{moneda_color_clase}}/g, cot.moneda === 'USD' ? 'moneda-usd' : 'moneda-mxn')
-            .replace(/{{texto_monto_letras}}/g, '');
+        const cargarFuente = (archivo: string): string => {
+            const ruta = path.join(__dirname, '../assets/fonts', archivo);
+            return 'data:font/ttf;base64,' + fs.readFileSync(ruta, 'base64');
+        };
+
+        const valores: Record<string, string> = {
+            fuente_regular: cargarFuente('NotoSans-Regular.ttf'),
+            fuente_bold: cargarFuente('NotoSans-Bold.ttf'),
+            logo_atc_base64: logoBase64,
+            banner_marcas_base64: bannerBase64,
+            smc_base64: smcBase64,
+            num_cotizacion: escapeHtml(cot.num_cotizacion),
+            fecha: escapeHtml(new Date(cot.fecha).toLocaleDateString('es-MX')),
+            nombre_cliente: escapeHtml(cot.nombre_cliente_final),
+            direccion_cliente: escapeHtml(cot.direccion_final),
+            contacto: escapeHtml(cot.contacto_final),
+            ciudad_destino: escapeHtml(cot.ciudad_destino),
+            email_cliente: escapeHtml(cot.email_cliente_final),
+            telfax_cliente: escapeHtml(cot.telfax_cliente_final),
+            tel_asesor: escapeHtml(cot.tel_asesor),
+            nombre_asesor: escapeHtml(cot.nombre_asesor),
+            filas_productos: filasHtml,
+            vigencia_dias: escapeHtml(cot.vigencia_dias || 15),
+            subtotal: formatearImporte(cot.subtotal),
+            iva: formatearImporte(cot.iva),
+            total: formatearImporte(cot.total),
+            moneda_texto: esUSD ? 'DOLARES AMERICANOS' : 'MONEDA NACIONAL',
+            moneda_color_clase: esUSD ? 'moneda-usd' : 'moneda-mxn',
+            texto_monto_letras: ''
+        };
+
+        const htmlListo = htmlString.replace(/{{([a-z0-9_]+)}}/g, (marcador, clave: string) => {
+            if (!Object.prototype.hasOwnProperty.call(valores, clave)) {
+                throw new Error('Marcador desconocido en plantilla: ' + marcador);
+            }
+            return valores[clave];
+        });
 
         const browser = await puppeteer.launch({
             headless: true,
@@ -396,53 +428,128 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
             ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH })
         });
 
-        const page = await browser.newPage();
+        try {
+            // Requiere: npm install pdf-lib
+            const { PDFDocument } = await import('pdf-lib');
+            const page = await browser.newPage();
 
-        const DPI = 96;
-        const anchoHojaPulgadas = 11;
-        const altoHojaPulgadas = 8.5;
-        const margenPulgadas = 10 / 25.4;
+            const DPI = 96;
+            const anchoHojaPulgadas = 11;
+            const altoHojaPulgadas = 8.5;
+            const margenPulgadas = 10 / 25.4;
 
-        const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
-        const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
+            const anchoUtilPx = Math.floor((anchoHojaPulgadas - margenPulgadas * 2) * DPI);
+            const altoUtilPx = Math.floor((altoHojaPulgadas - margenPulgadas * 2) * DPI);
 
-        await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
-        await page.setContent(htmlListo, { waitUntil: 'load' });
+            await page.setViewport({ width: anchoUtilPx, height: altoUtilPx });
+            await page.emulateMediaType('print');
+            await page.setContent(htmlListo, { waitUntil: 'load' });
 
-        const alturaContenidoPx = await page.evaluate('document.body.scrollHeight') as number;
+        
+            await page.evaluate(`(async () => {
+                const fuentes = await Promise.all([
+                    document.fonts.load('400 9px "CotizacionPDF"'),
+                    document.fonts.load('700 9px "CotizacionPDF"')
+                ]);
+                await document.fonts.ready;
+                if (fuentes.some(grupo => grupo.length === 0)) {
+                    throw new Error('No se cargaron las fuentes de la cotización');
+                }
+            })()`);
 
-        let escala = 1;
-        if (alturaContenidoPx > altoUtilPx) {
-            escala = altoUtilPx / alturaContenidoPx;
-            escala = Math.max(escala, 0.65);
+
+            await page.evaluate(`Promise.all(Array.from(document.images, imagen => imagen.decode()))`);
+            await page.evaluate(`document.getElementById('cotizacion').style.width = '${anchoUtilPx}px'`);
+
+            const ESCALA_MINIMA = 0.65;
+            const HOLGURA_PX = 8;
+            const modos = ['normal', 'compacto', 'muy-compacto'];
+            let escala = 1;
+            let modoElegido = 'normal';
+
+            let cabeEnUnaPagina = false;
+
+            for (const modo of modos) {
+                const escalas = modo === 'muy-compacto'
+                    ? [1, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, ESCALA_MINIMA]
+                    : [1, 0.95, 0.90];
+                await page.evaluate(`document.getElementById('cotizacion').dataset.densidad = '${modo}'`);
+                for (const candidata of escalas) {
+                    const anchoComposicion = (anchoUtilPx - HOLGURA_PX) / candidata;
+                    await page.evaluate(`document.getElementById('cotizacion').style.width = '${anchoComposicion}px'`);
+                    const medida = await page.evaluate(`(() => {
+                        const contenedor = document.getElementById('cotizacion');
+                        const rect = contenedor.getBoundingClientRect();
+                        return {
+                            alto: Math.max(rect.height, contenedor.scrollHeight),
+                            ancho: Math.max(rect.width, contenedor.scrollWidth)
+                        };
+                    })()`) as { alto: number; ancho: number };
+                    if (medida.alto * candidata <= altoUtilPx - HOLGURA_PX &&
+                        medida.ancho * candidata <= anchoUtilPx - 2) {
+                        escala = candidata;
+                        modoElegido = modo;
+                        cabeEnUnaPagina = true;
+                        break;
+                    }
+                }
+                if (cabeEnUnaPagina) break;
+            }
+
+            if (!cabeEnUnaPagina || !Number.isFinite(escala) || escala < ESCALA_MINIMA) {
+                throw new Error(
+                    'La cotización contiene demasiado texto para una sola hoja carta horizontal. ' +
+                    'Reduce las descripciones o utiliza una plantilla de varias páginas. No se ha recortado ningún producto.'
+                );
+            }
+
+            for (let intento = 0; intento < 5; intento++) {
+                const pdfBuffer = await page.pdf({
+                    format: 'Letter',
+                    printBackground: true,
+                    landscape: true,
+                    scale: escala,
+                    margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
+                });
+                const documento = await PDFDocument.load(pdfBuffer);
+                if (documento.getPageCount() === 1) return pdfBuffer;
+
+                const siguienteEscala = escala * 0.97;
+                if (siguienteEscala < ESCALA_MINIMA) break;
+                escala = siguienteEscala;
+            }
+
+            throw new Error(
+                'No fue posible ajustar la cotización a una sola página en modo ' + modoElegido +
+                '. Reduce el texto o utiliza una plantilla de varias páginas. No se ha recortado ningún producto.'
+            );
+        } finally {
+            await browser.close();
         }
-
-        const pdfBuffer = await page.pdf({
-            format: 'Letter',
-            printBackground: true,
-            landscape: true,
-            scale: escala,
-            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' }
-        });
-
-        await browser.close();
-        return pdfBuffer;
 
     } finally {
         connection.release();
     }
 }
-    static async vincularCliente(id_cotizacion: number, id_cliente: number) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.query(
-                'UPDATE cotizaciones SET id_cliente = ? WHERE id = ?',
-                [id_cliente, id_cotizacion]
-            );
-            return { mensaje: 'Cliente vinculado correctamente a la cotización.' };
-        } finally {
-            connection.release();
+  static async vincularCliente(id_cotizacion: number, id_cliente: number) {
+    const connection = await pool.getConnection();
+    try {
+        const [clienteRows]: any = await connection.query(
+            'SELECT id FROM clientes WHERE id = ? AND (estatus = 1 OR Estatus = 1)',
+            [id_cliente]
+        );
+        if (clienteRows.length === 0) {
+            throw new Error('El cliente indicado no existe o está inactivo.');
         }
+
+        await connection.query(
+            'UPDATE cotizaciones SET id_cliente = ? WHERE id = ?',
+            [id_cliente, id_cotizacion]
+        );
+        return { mensaje: 'Cliente vinculado correctamente a la cotización.' };
+    } finally {
+        connection.release();
     }
+}
     
 }

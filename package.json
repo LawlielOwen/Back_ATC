@@ -27,6 +27,7 @@
     "mysql2": "^3.22.3",
     "node-cron": "^4.2.1",
     "pdf-extraction": "^1.0.2",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "3.11.174",
     "pdfreader": "^3.0.8",
     "puppeteer": "^25.1.0",

@@ -1,7 +1,64 @@
 import { Request, Response } from "express";
 import { ValeService } from "../Service/Vales";
 import { io } from '../server'
+import { obtenerIdSesionVale } from './SesionVale';
 export class ValeController {
+    private static responderErrorVale(res: Response, error: any) {
+        if (error?.sqlState === '45000') {
+            return res.status(409).json({ error: error.sqlMessage || error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Error interno del servidor al procesar el vale' });
+    }
+
+    private static errorDeResultado(result: any): string | null {
+        const mensaje = result?.[0]?.[0]?.mensaje ?? result?.mensaje;
+        return typeof mensaje === 'string' && /^error/i.test(mensaje) ? mensaje : null;
+    }
+
+      static async cotizacionesDisponiblesVale(req: Request, res: Response) {
+        const idAsesor = Number(req.query.id_asesor);
+        if (!Number.isSafeInteger(idAsesor) || idAsesor <= 0) {
+            return res.status(400).json({ error: 'Se requiere un id_asesor valido' });
+        }
+        try {
+            return res.status(200).json(await ValeService.cotizacionesDisponiblesVale(idAsesor));
+        } catch (error: any) { return ValeController.responderErrorVale(res, error); }
+    }
+
+    static async productosCotizacionVale(req: Request, res: Response) {
+        const idAsesor = Number(req.query.id_asesor);
+        if (!Number.isSafeInteger(idAsesor) || idAsesor <= 0) {
+            return res.status(400).json({ error: 'Se requiere un id_asesor valido' });
+        }
+        const idCotizacion = Number(req.params.id_cotizacion);
+        if (!Number.isSafeInteger(idCotizacion) || idCotizacion <= 0) {
+            return res.status(400).json({ error: 'ID de cotizacion no valido' });
+        }
+        try {
+            return res.status(200).json(await ValeService.productosCotizacionVale(idCotizacion, idAsesor));
+        } catch (error: any) { return ValeController.responderErrorVale(res, error); }
+    }
+
+    static async solicitarValeDesdeCotizacion(req: Request, res: Response) {
+        const idAsesor = Number(req.body?.id_asesor);
+        if (!Number.isSafeInteger(idAsesor) || idAsesor <= 0) {
+            return res.status(400).json({ error: 'Se requiere un id_asesor valido' });
+        }
+        const idCotizacion = Number(req.body?.id_cotizacion);
+        if (!Number.isSafeInteger(idCotizacion) || idCotizacion <= 0) {
+            return res.status(400).json({ error: 'El ID de cotizacion es obligatorio y debe ser valido' });
+        }
+        try {
+            const result = await ValeService.solicitarValeDesdeCotizacion(idCotizacion, idAsesor);
+            io.to('rol_Almacen').to('rol_Administrador').emit('nueva_notificacion', {
+                titulo: 'Nueva Solicitud', mensaje: 'Se ha solicitado un vale desde una cotizacion.'
+            });
+            io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+            return res.status(201).json(result);
+        } catch (error: any) { return ValeController.responderErrorVale(res, error); }
+    }
+
     static async getVales(req: Request, res: Response) {
         try {
             const pagina = parseInt(req.query.pagina as string) || 1;
@@ -34,11 +91,16 @@ static async solicitarVale(req: any, res: any) {
         try {
             const { id_asesor, id_cliente, id_pedido, productos } = req.body;
             
-            if (!id_asesor || !id_cliente || !id_pedido || !productos) {
+            if (!id_asesor || !id_cliente || !id_pedido || !Array.isArray(productos) || productos.length === 0) {
                 return res.status(400).json({ error: 'Los campos de asesor, cliente, pedido y productos son obligatorios' });
             }
             
+            if (!productos.every((p: any) => Number.isSafeInteger(Number(p.piezas)) && Number(p.piezas) > 0)) {
+                return res.status(400).json({ error: 'Las cantidades deben ser enteros mayores a cero' });
+            }
             const result = await ValeService.solicitarVale(id_asesor, id_cliente, id_pedido, productos);
+            const errorResultado = ValeController.errorDeResultado(result);
+            if (errorResultado) return res.status(409).json({ error: errorResultado });
             
             io.to('rol_Almacen').to('rol_Administrador').emit('nueva_notificacion', {
                 titulo: 'Nueva Solicitud',
@@ -50,7 +112,7 @@ static async solicitarVale(req: any, res: any) {
             
         } catch (error: any) {
             console.error(error);
-            return res.status(500).json({ error: 'Error interno del servidor al crear el vale' });
+            return ValeController.responderErrorVale(res, error);
         }
     }
     static async aceptaVale(req: Request, res: Response) {
@@ -61,6 +123,8 @@ static async solicitarVale(req: any, res: any) {
             }
             
             const result = await ValeService.aceptarVale(id, comentarios);
+            const errorResultado = ValeController.errorDeResultado(result);
+            if (errorResultado) return res.status(409).json({ error: errorResultado });
             
             if (id_asesor) {
                 io.to(`usuario_${id_asesor}`).emit('nueva_notificacion', {
@@ -74,7 +138,7 @@ static async solicitarVale(req: any, res: any) {
 
         } catch (error: any) {
             console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+            return ValeController.responderErrorVale(res, error);
         }
     }
 

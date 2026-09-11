@@ -3,8 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 8mm; size: letter landscape; }
-        body { font-family: 'Arial', sans-serif; font-size: 9px; color: #000; margin: 0; padding: 0; }
+        @font-face {
+            font-family: 'CotizacionPDF';
+            src: url('{{fuente_regular}}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'CotizacionPDF';
+            src: url('{{fuente_bold}}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+        }
+        @page { margin: 10mm; size: letter landscape; }
+        body { font-family: 'CotizacionPDF', sans-serif; font-size: 9px; color: #000; margin: 0; padding: 0; }
 
         /* ── ENCABEZADO PRINCIPAL: Logo | Datos empresa | SMC | Folio+Cotización ── */
         .main-header {
@@ -379,9 +391,76 @@
             margin-top: 6px;
             text-transform: uppercase;
         }
+
+        /* Ajuste de una página: no se oculta ni se trunca el contenido. */
+        #cotizacion { width: 978px; display: flow-root; }
+        #cotizacion, #cotizacion * { box-sizing: border-box; }
+        .client-box, .contact-box { overflow: visible; }
+        .main-header > div, .client-col, .contact-col,
+        .extra-desc-text, .extra-desc-origen { min-width: 0; }
+        .kv-value, .kv-value-right, .header-info, .header-right,
+        .extra-desc-text, .extra-desc-origen { overflow-wrap: anywhere; }
+        .header-right { text-align: right; }
+        .folio-line, .folio-num, .txt-cotizacion-italic, .txt-web {
+            margin-left: 0; text-align: right;
+        }
+        .items-table { break-inside: auto; page-break-inside: auto; }
+        .items-table tr { break-inside: avoid; page-break-inside: avoid; }
+        .items-table td.td-salvo-venta { white-space: nowrap; }
+        .brand-banner { max-height: 55px; }
+
+        /* Compacto: quita espacios antes de reducir el tamaño del texto. */
+        #cotizacion[data-densidad="compacto"] .items-table td,
+        #cotizacion[data-densidad="muy-compacto"] .items-table td {
+            padding: 1px 3px; line-height: 1.15;
+        }
+        #cotizacion[data-densidad="compacto"] .extra-desc-flex,
+        #cotizacion[data-densidad="muy-compacto"] .extra-desc-flex {
+            padding: 0;
+        }
+        #cotizacion[data-densidad="compacto"] .items-table th,
+        #cotizacion[data-densidad="muy-compacto"] .items-table th {
+            padding: 2px 3px;
+        }
+        #cotizacion[data-densidad="compacto"] .client-contact-wrapper,
+        #cotizacion[data-densidad="muy-compacto"] .client-contact-wrapper {
+            margin-top: 4px; margin-bottom: 5px;
+        }
+        #cotizacion[data-densidad="compacto"] .footer-bottom-flex,
+        #cotizacion[data-densidad="compacto"] .box-currency,
+        #cotizacion[data-densidad="muy-compacto"] .footer-bottom-flex,
+        #cotizacion[data-densidad="muy-compacto"] .box-currency {
+            margin-top: 6px;
+        }
+        #cotizacion[data-densidad="compacto"] .terms-box,
+        #cotizacion[data-densidad="muy-compacto"] .terms-box {
+            margin-top: 6px; padding: 5px 9px; line-height: 1.2;
+        }
+        #cotizacion[data-densidad="compacto"] .terms-bold,
+        #cotizacion[data-densidad="muy-compacto"] .terms-bold { margin-top: 3px; }
+
+        /* Muy compacto: conserva todo el texto, permite envolverlo y acorta el encabezado. */
+        #cotizacion[data-densidad="muy-compacto"] .items-table td {
+            font-size: 8px; padding-top: 0.5px; padding-bottom: 0.5px;
+        }
+        #cotizacion[data-densidad="muy-compacto"] .items-table th { font-size: 7.5px; }
+        #cotizacion[data-densidad="muy-compacto"] .header-left { padding-top: 4px; }
+        #cotizacion[data-densidad="muy-compacto"] .logo-atc { max-height: 65px; }
+        #cotizacion[data-densidad="muy-compacto"] .smc-logo { max-height: 48px; }
+        #cotizacion[data-densidad="muy-compacto"] .brand-banner { max-height: 32px; }
+        #cotizacion[data-densidad="muy-compacto"] .brands-bar { padding: 2px 6px; }
+        #cotizacion[data-densidad="muy-compacto"] .txt-cotizacion-italic,
+        #cotizacion[data-densidad="muy-compacto"] .txt-web { margin-top: 5px; }
+        #cotizacion[data-densidad="muy-compacto"] .kv-table td,
+        #cotizacion[data-densidad="muy-compacto"] .kv-table-right td { padding-top: 0; padding-bottom: 0; }
+        #cotizacion[data-densidad="muy-compacto"] .box-green-cond {
+            font-size: 9px; padding: 2px 4px; line-height: 1.15;
+        }
+        #cotizacion[data-densidad="muy-compacto"] .terms-box { font-size: 8px; }
     </style>
 </head>
 <body>
+<div id="cotizacion" data-densidad="normal">
 
     <div class="main-header">
         <div class="header-left">
@@ -477,6 +556,12 @@
         </thead>
         <tbody>
             {{filas_productos}}
+            <!-- Siempre presente, independientemente del número de productos. -->
+            <tr class="fila-aviso">
+                <td></td><td></td><td></td><td></td><td></td>
+                <td class="td-salvo-venta">SALVO PREVIA VENTA</td>
+                <td></td><td></td>
+            </tr>
         </tbody>
     </table>
 
@@ -536,5 +621,6 @@
         <div class="terms-line">4.- Precios sujetos a cambio sin previo aviso.</div>
         <div class="terms-bold">NO SE ACEPTA CANCELACIONES NI DEVOLUCIONES DE NINGUN TIPO</div>
     </div>
+</div>
 </body>
 </html>
