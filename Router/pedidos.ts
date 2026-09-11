@@ -6,7 +6,9 @@ const router = Router();
 
 router.get('/pedido', PedidoController.buscarYFiltrar);
 router.get('/pedido/estadisticas', PedidoController.contarPedidos);
+router.post('/pedido', PedidoController.crearPedidoDirecto);
 router.get('/pedido/:id', PedidoController.obtenerDetalles);
+
 
 
 router.post('/pedido/:id/factura', uploadRecibo.single('factura'), PedidoController.subirFactura);

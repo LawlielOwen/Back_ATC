@@ -135,4 +135,46 @@ static async buscarYFiltrar(
         
         return rows[0].mensaje;
     }
+static async crearPedidoDirecto(
+    id_cliente: number,
+    id_asesor: number,
+    orden_compra: string | null,
+    moneda: string,
+    tipo_cambio: number,
+    vigencia_dias: number,
+    detalles: any[]
+): Promise<{ id_pedido: number; mensaje: string }> {
+
+    const detallesJSON = JSON.stringify(detalles);
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_crear_pedido_directo(?, ?, ?, ?, ?, ?, ?, @p_id_pedido, @p_mensaje)',
+            [
+                id_cliente,
+                id_asesor,
+                orden_compra,
+                moneda,
+                tipo_cambio,
+                vigencia_dias,
+                detallesJSON
+            ]
+        );
+
+        const [outRows]: any = await connection.query(
+            'SELECT @p_id_pedido AS id_pedido, @p_mensaje AS mensaje'
+        );
+
+        return {
+            id_pedido: outRows[0].id_pedido,
+            mensaje: outRows[0].mensaje
+        };
+
+    } finally {
+        connection.release();
+    }
+}
+
 }

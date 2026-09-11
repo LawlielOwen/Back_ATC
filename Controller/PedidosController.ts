@@ -176,4 +176,46 @@ static async subirFactura(req: Request, res: Response) {
         return res.status(500).json({ error: 'Error interno del servidor al procesar el pago con crédito.' });
     }
 }
+static async crearPedidoDirecto(req: Request, res: Response) {
+    try {
+        const {
+            id_cliente,
+            id_asesor,
+            orden_compra,
+            moneda,
+            tipo_cambio,
+            vigencia_dias,
+            detalles
+        } = req.body;
+
+        if (!id_cliente) {
+            return res.status(400).json({ error: 'Debes indicar el cliente del pedido.' });
+        }
+        if (!id_asesor) {
+            return res.status(400).json({ error: 'Debes indicar el asesor del pedido.' });
+        }
+        if (!Array.isArray(detalles) || detalles.length === 0) {
+            return res.status(400).json({ error: 'El pedido debe tener al menos un producto.' });
+        }
+
+        const result = await PedidoService.crearPedidoDirecto(
+            id_cliente,
+            id_asesor,
+            orden_compra || null,
+            moneda || 'MONEDA NACIONAL',
+            tipo_cambio || 1,
+            vigencia_dias || 15,
+            detalles
+        );
+
+        if (result.id_pedido === -1) {
+            return res.status(400).json({ error: result.mensaje });
+        }
+
+        return res.status(201).json(result);
+    } catch (error: any) {
+        console.error('Error en crearPedidoDirecto:', error);
+        return res.status(500).json({ error: 'Error interno del servidor al crear el pedido.' });
+    }
+}
 }
