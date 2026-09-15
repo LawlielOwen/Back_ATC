@@ -51,7 +51,7 @@ export class ProveedorService {
     }
     static async consultarDetallesPedido(id_pedido: number) {
         const [rows]: any = await pool.query(
-            'SELECT * FROM verDetallesPedidos WHERE id_pedido = ?',
+            'SELECT * FROM verDetallesPedidoProveedor WHERE id_pedido = ?',
             [id_pedido]
         );
         
