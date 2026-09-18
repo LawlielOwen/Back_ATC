@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { ValeService } from "../Service/Vales";
+import { ValeService} from "../Service/Vales";
 import { io } from '../server'
 import { obtenerIdSesionVale } from './SesionVale';
 export class ValeController {
@@ -115,32 +115,35 @@ static async solicitarVale(req: any, res: any) {
             return ValeController.responderErrorVale(res, error);
         }
     }
-    static async aceptaVale(req: Request, res: Response) {
-        try {
-            const { id, comentarios, id_asesor } = req.body; 
-            if (!id) {
-                return res.status(400).json({ error: 'El ID del vale es obligatorio' });
-            }
-            
-            const result = await ValeService.aceptarVale(id, comentarios);
-            const errorResultado = ValeController.errorDeResultado(result);
-            if (errorResultado) return res.status(409).json({ error: errorResultado });
-            
-            if (id_asesor) {
-                io.to(`usuario_${id_asesor}`).emit('nueva_notificacion', {
-                    titulo: 'Vale Aceptado',
-                    mensaje: `Tu vale VS-${id} ha sido autorizado.`
-                });
-                io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
-            }
-           io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
-            res.status(200).json(result);
-
-        } catch (error: any) {
-            console.error(error);
-            return ValeController.responderErrorVale(res, error);
+   static async aceptaVale(req: Request, res: Response) {
+    try {
+        const { id, comentarios, id_asesor, detalles } = req.body; 
+        
+        if (!id) {
+            return res.status(400).json({ error: 'El ID del vale es obligatorio' });
         }
+        
+        const result = await ValeService.autorizarVale(id, comentarios, detalles);
+        
+        const errorResultado = ValeController.errorDeResultado(result);
+        if (errorResultado) return res.status(409).json({ error: errorResultado });
+        
+        if (id_asesor) {
+            io.to(`usuario_${id_asesor}`).emit('nueva_notificacion', {
+                titulo: 'Vale Aceptado',
+                mensaje: `Tu vale VS-${id} ha sido autorizado.`
+            });
+            io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
+        }
+        io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+        
+        res.status(200).json(result);
+
+    } catch (error: any) {
+        console.error(error);
+        return ValeController.responderErrorVale(res, error);
     }
+}
 
     static async rechazaVale(req: Request, res: Response) {
         try {
@@ -239,37 +242,37 @@ static async pedidosDisponiblesVale(req: any, res: any) {
         }
     }
 
-  static async aceptaValeDemo(req: Request, res: Response) {
-        try {
-            const { id, comentarios, id_asesor } = req.body;
-            
-            if (!id) {
-                return res.status(400).json({ error: 'El ID del vale es obligatorio' });
-            }
-            
-            const result: any = await ValeService.aceptarValeDemo(id, comentarios);
-            const mensaje = (result[0] && result[0][0]) ? result[0][0].mensaje : (result.mensaje || '');
+static async aceptaValeDemo(req: Request, res: Response) {
+    try {
+        const { id, comentarios, id_asesor, detalles } = req.body;
 
-            if (typeof mensaje === 'string' && mensaje.startsWith('Error')) {
-                return res.status(400).json({ error: mensaje });
-            }
-            
-            if (id_asesor) {
-                io.to(`usuario_${id_asesor}`).emit('nueva_notificacion', {
-                    titulo: 'Vale Demo Autorizado',
-                    mensaje: `Tu vale para demostración VS-${id} ha sido autorizado y los equipos apartados.`
-                });
-                io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
-            }
-            io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
-            
-            res.status(200).json({ mensaje: mensaje, data: result });
-
-        } catch (error: any) {
-            console.error('Error al aceptar vale demo:', error);
-            res.status(500).json({ error: 'Error interno del servidor al autorizar el vale demo' });
+        if (!id) {
+            return res.status(400).json({ error: 'El ID del vale es obligatorio' });
         }
+
+        const result: any = await ValeService.aceptarValeDemo(id, comentarios, detalles);
+        const mensaje = (result[0] && result[0][0]) ? result[0][0].mensaje : (result.mensaje || '');
+
+        if (typeof mensaje === 'string' && mensaje.startsWith('Error')) {
+            return res.status(400).json({ error: mensaje });
+        }
+
+        if (id_asesor) {
+            io.to(`usuario_${id_asesor}`).emit('nueva_notificacion', {
+                titulo: 'Vale Demo Autorizado',
+                mensaje: `Tu vale para demostración VS-${id} ha sido autorizado y los equipos apartados.`
+            });
+            io.to(`usuario_${id_asesor}`).emit('actualizar_tabla_vales');
+        }
+        io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+
+        res.status(200).json({ mensaje: mensaje, data: result });
+
+    } catch (error: any) {
+        console.error('Error al aceptar vale demo:', error);
+        res.status(500).json({ error: 'Error interno del servidor al autorizar el vale demo' });
     }
+}
     static async visitasDisponiblesVale(req: any, res: any) {
         try {
             const { id_tecnico } = req.params;
@@ -287,4 +290,106 @@ static async pedidosDisponiblesVale(req: any, res: any) {
             return res.status(500).json({ error: 'Error interno del servidor al cargar las visitas' });
         }
     }
+   static async listarFoliosAsesores(req: Request, res: Response) {
+  try {
+    const asesores = await ValeService.listarFoliosAsesores();
+    res.status(200).json({ asesores });
+  } catch (error: any) {
+    console.error('Error al listar folios de asesores:', error);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+}
+
+static async obtenerFolioAsesor(req: Request, res: Response) {
+  try {
+    const idAsesor = parseInt(req.params.idAsesor as string);
+    if (isNaN(idAsesor)) {
+      return res.status(400).json({ error: 'id de asesor inválido.' });
+    }
+
+    const folio = await ValeService.obtenerFolioAsesor(idAsesor);
+    if (!folio) {
+      return res.status(404).json({ error: 'Asesor no encontrado.' });
+    }
+
+    res.status(200).json(folio);
+  } catch (error: any) {
+    console.error('Error al obtener el folio del asesor:', error);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+}
+
+static async actualizarFolioAsesor(req: Request, res: Response) {
+  try {
+    const idAsesor = parseInt(req.params.idAsesor as string);
+    const { iniciales, consecutivo } = req.body;
+
+    if (isNaN(idAsesor)) {
+      return res.status(400).json({ error: 'id de asesor inválido.' });
+    }
+    if (!iniciales || typeof iniciales !== 'string' || !/^[A-Za-z]{1,5}$/.test(iniciales.trim())) {
+      return res.status(400).json({ error: 'Las iniciales deben tener de 1 a 5 letras.' });
+    }
+    const consecutivoNum = parseInt(consecutivo);
+    if (isNaN(consecutivoNum) || consecutivoNum < 1) {
+      return res.status(400).json({ error: 'Un consecutivo válido mayor a 0 es requerido.' });
+    }
+
+    const actualizado = await ValeService.actualizarFolioAsesor(idAsesor, iniciales, consecutivoNum);
+
+    if (actualizado) {
+      return res.status(200).json({ mensaje: 'Folio del asesor actualizado correctamente.' });
+    } else {
+      return res.status(404).json({ error: 'No se encontró al asesor.' });
+    }
+  } catch (error: any) {
+    console.error('Error al actualizar el folio del asesor:', error);
+    const status = error.status || 500;
+    return res.status(status).json({ error: error.message || 'Error interno del servidor.' });
+  }
+}
+
+static async verificarFolioVale(req: Request, res: Response) {
+  try {
+    const folio = (req.query.folio as string || '').trim();
+    if (!folio) {
+      return res.status(400).json({ error: 'Parámetro folio requerido.' });
+    }
+
+    const resultado = await ValeService.verificarFolioValeExistente(folio);
+    res.status(200).json(resultado);
+  } catch (error: any) {
+    console.error('Error al verificar folio de vale:', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+}
+static async descargarPDF(req: Request, res: Response) {
+    try {
+        const idVale = Number(req.params.id);
+
+        if (!Number.isInteger(idVale) || idVale <= 0) {
+            res.status(400).json({
+                error: 'El ID del vale no es válido'
+            });
+            return;
+        }
+
+        const pdfBuffer = await ValeService.generarPDFvale(idVale);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="Vale_${idVale}.pdf"`
+        );
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        res.end(pdfBuffer);
+    } catch (error: unknown) {
+        console.error('Error generando PDF:', error);
+
+        res.status(500).json({
+            error: 'Error al generar el documento PDF'
+        });
+    }
+}
 }

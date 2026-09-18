@@ -4,12 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node-dev --respawn server.ts",
-    "build": "tsc && copyfiles -u 0 assets/**/* Template/**/* dist/",
-    "postinstall": "npx puppeteer browsers install chrome",
-    "start": "node dist/server.js"
-  },
+  "test": "echo \"Error: no test specified\" && exit 1",
+  "dev": "ts-node-dev --respawn server.ts",
+  "build": "tsc && copyfiles \"assets/**/*\" \"Template/**/*\" dist",
+  "postinstall": "npx puppeteer browsers install chrome",
+  "start": "node dist/server.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",

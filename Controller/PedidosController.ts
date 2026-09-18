@@ -218,4 +218,24 @@ static async crearPedidoDirecto(req: Request, res: Response) {
         return res.status(500).json({ error: 'Error interno del servidor al crear el pedido.' });
     }
 }
+static async reembolsarPedido(req: Request, res: Response) {
+        try {
+            const id_pedido = parseInt(req.params.id as string);
+            if (isNaN(id_pedido)) {
+                return res.status(400).json({ error: 'El ID del pedido no es válido.' });
+            }
+
+            const mensaje = await PedidoService.reembolsarPedido(id_pedido);
+            return res.status(200).json({ mensaje });
+
+        } catch (error: any) {
+            console.error('Error en reembolsarPedido:', error);
+
+            if (error.message && error.message.startsWith('Error:')) {
+                return res.status(400).json({ error: error.message.replace('Error: ', '') });
+            }
+
+            return res.status(500).json({ error: 'Error interno del servidor al procesar el reembolso del pedido.' });
+        }
+    }
 }

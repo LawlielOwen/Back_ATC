@@ -28,7 +28,6 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
     try {
         await connection.beginTransaction();
 
-        // Actualizado a 16 parámetros (incluyendo los @OUT)
         await connection.query('CALL sp_guardar_cotizacion(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @nuevo_id, @nuevo_folio)', [
             c.id_asesor,
             c.id_cliente || null,
@@ -53,7 +52,6 @@ static async guardarCotizacion(c: any): Promise<{ id: number, num_cotizacion: st
         if (c.detalles && c.detalles.length > 0) {
             for (const item of c.detalles) {
                 await connection.query(
-                    // Se agregó la columna "observaciones"
                     `INSERT INTO detalles_cotizacion 
                     (id_cotizacion, id_producto, codigo_manual, descripcion_manual, extra_descripcion_manual, observaciones, cantidad_producto, origen, tiempo_entrega, precio_unitario_cotizado, tipo_flete, valor_flete, moneda_flete, costo_flete) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // Ahora son 14 signos de interrogación

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <style>
+        @font-face {
+            font-family: 'CotizacionPDF';
+            src: url('{{fuente_regular}}') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'CotizacionPDF';
+            src: url('{{fuente_bold}}') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+        }
+
+        @page {
+            margin: 12mm;
+            size: letter landscape;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'CotizacionPDF', sans-serif;
+            font-size: 10px;
+            color: #000;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        #vale {
+            width: 100%;
+        }
+
+        /* ENCABEZADO */
+        .vale-header {
+            display: flex;
+            align-items: center;
+            border-bottom: 0.5px solid #000;
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+            break-inside: avoid;
+        }
+
+        .vale-header-logo {
+            width: 26%;
+            padding-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-atc {
+            display: block;
+            width: 100%;
+            max-height: 85px;
+            object-fit: contain;
+        }
+
+        .vale-header-titulos {
+            width: 74%;
+            text-align: center;
+        }
+
+        .titulo-empresa {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0d1f38;
+        }
+
+        .titulo-sucursal {
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 4px;
+            color: #0d1f38;
+        }
+
+        .titulo-vale {
+            font-size: 13px;
+            margin-top: 5px;
+            color: #003B8A;
+            text-transform: uppercase;
+        }
+
+        /* DATOS DEL VALE */
+        .vale-datos-fila {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            margin: 14px 0;
+            font-size: 11px;
+            break-inside: avoid;
+        }
+
+        .vale-datos-izq,
+        .vale-datos-der {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .vale-datos-izq {
+            flex: 1;
+        }
+
+        .vale-datos-der {
+            flex-shrink: 0;
+        }
+
+        .dato-label {
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .dato-valor {
+            display: inline-block;
+            border-bottom: 0.5px solid #000;
+            padding: 0 5px 2px;
+            text-align: center;
+            overflow-wrap: anywhere;
+            min-width: 0;
+        }
+
+        .cotizacion-valor {
+            width: 180px;
+            max-width: 100%;
+        }
+
+        .empresa-valor {
+            flex: 1;
+            max-width: 420px;
+        }
+
+        .folio-valor {
+            min-width: 110px;
+            color: #db1c1c;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        /* FECHA */
+        .fecha-bloque {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .fecha-bloque > .dato-label {
+            padding-top: 2px;
+        }
+
+        .fecha-caja {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .fecha-num {
+            min-width: 30px;
+            text-align: center;
+            border-bottom: 0.5px solid #000;
+            padding: 0 4px 2px;
+        }
+
+        .fecha-etq {
+            font-size: 8px;
+            margin-top: 2px;
+        }
+
+        /* TABLA */
+        .items-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-top: 12px;
+            border: 0.5px solid #000;
+            page-break-inside: auto;
+        }
+
+        .items-table thead {
+            display: table-header-group;
+        }
+
+        .items-table tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .items-table th,
+        .items-table td {
+            text-align: center;
+            vertical-align: middle;
+            padding: 4px 5px;
+            overflow-wrap: anywhere;
+            word-break: normal;
+            line-height: 1.25;
+        }
+
+        .items-table th {
+            border: 0.5px solid #000;
+            background-color: #d9d9d9;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .items-table td {
+            border-left: 0.5px solid #000;
+            border-right: 0.5px solid #000;
+            border-top: 0.5px dotted #666;
+            border-bottom: 0.5px dotted #666;
+            font-size: 10px;
+            font-weight: 400;
+        }
+
+        .items-table tbody tr:last-child td {
+            border-bottom: 0.5px solid #000;
+        }
+
+        .col-num {
+            width: 4%;
+        }
+
+        .col-codigo-interno {
+            width: 11%;
+        }
+
+        .col-codigo-japon {
+            width: 15%;
+        }
+
+        .col-descripcion {
+            width: 35%;
+        }
+
+        .col-piezas {
+            width: 6%;
+        }
+
+        .col-observaciones {
+            width: 29%;
+        }
+
+        .fila-vacia td {
+            height: 20px;
+        }
+
+        .items-table .fila-observacion-general td {
+            padding: 8px;
+            border-top: 0.5px solid #000;
+            text-align: center;
+        }
+
+        .observacion-titulo {
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+
+        /* FIRMAS */
+        .vale-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            margin-top: 24px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .firma-col {
+            width: 46%;
+            min-width: 0;
+            text-align: center;
+        }
+
+        .firma-titulo {
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-bottom: 36px;
+        }
+
+        .firma-linea {
+            border-top: 0.5px solid #000;
+            padding-top: 4px;
+        }
+
+        .firma-nombre {
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            overflow-wrap: anywhere;
+        }
+
+        .firma-puesto {
+            font-size: 9px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="vale">
+
+        <div class="vale-header">
+            <div class="vale-header-logo">
+                <img
+                    src="{{logo_atc_base64}}"
+                    class="logo-atc"
+                    alt="ATC"
+                >
+            </div>
+
+            <div class="vale-header-titulos">
+                <div class="titulo-empresa">
+                    AUTOMATIZACION, TECNOLOGIA Y CONTROL
+                </div>
+
+                <div class="titulo-sucursal">
+                    SUCURSAL LEON, GTO
+                </div>
+
+                <div class="titulo-vale">
+                    VALE DE SALIDA DE ALMACÉN
+                </div>
+            </div>
+        </div>
+
+        <div class="vale-datos-fila">
+            <div class="vale-datos-izq">
+                <span class="dato-label">{{origen_label}}:</span>
+                <span class="dato-valor cotizacion-valor">
+                    {{origen_folio}}
+                </span>
+            </div>
+
+            <div class="vale-datos-der">
+                <span class="dato-label">FOLIO:</span>
+                <span class="dato-valor folio-valor">
+                    {{folio_vale}}
+                </span>
+            </div>
+        </div>
+
+        <div class="vale-datos-fila">
+            <div class="vale-datos-izq">
+                <span class="dato-label">EMPRESA:</span>
+                <span class="dato-valor empresa-valor">
+                    {{empresa}}
+                </span>
+            </div>
+
+            <div class="fecha-bloque">
+                <span class="dato-label">FECHA DE SOLICITUD:</span>
+
+                <div class="fecha-caja">
+                    <span class="fecha-num">{{dia}}</span>
+                    <span class="fecha-etq">DÍA</span>
+                </div>
+
+                <div class="fecha-caja">
+                    <span class="fecha-num">{{mes}}</span>
+                    <span class="fecha-etq">MES</span>
+                </div>
+
+                <div class="fecha-caja">
+                    <span class="fecha-num">{{anio}}</span>
+                    <span class="fecha-etq">AÑO</span>
+                </div>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <colgroup>
+                <col class="col-num">
+                <col class="col-codigo-interno">
+                <col class="col-codigo-japon">
+                <col class="col-descripcion">
+                <col class="col-piezas">
+                <col class="col-observaciones">
+            </colgroup>
+
+            <thead>
+                <tr>
+                    <th scope="col">N.</th>
+                    <th scope="col">CÓDIGO<br>INTERNO</th>
+                    <th scope="col">CÓDIGO JAPÓN</th>
+                    <th scope="col">DESCRIPCIÓN</th>
+                    <th scope="col">PIEZAS</th>
+                    <th scope="col">OBSERVACIONES</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {{filas_productos}}
+                {{filas_vacias}}
+                {{observacion_general}}
+            </tbody>
+        </table>
+
+        <div class="vale-footer">
+            <div class="firma-col">
+                <div class="firma-titulo">Recibe Material</div>
+
+                <div class="firma-linea">
+                    <div class="firma-nombre">{{nombre_asesor}}</div>
+                    <div class="firma-puesto">Asesor de ventas</div>
+                </div>
+            </div>
+
+            <div class="firma-col">
+                <div class="firma-titulo">Entrega de Materiales</div>
+
+                <div class="firma-linea">
+                    <div class="firma-nombre">{{nombre_supervisor}}</div>
+                    <div class="firma-puesto">SUPERVISOR DE SUCURSAL</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

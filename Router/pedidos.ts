@@ -17,4 +17,5 @@ router.post('/pedido/:id/aceptar', PedidoController.aceptarPedido);
 
 router.post('/pedido/:id/cancelar', PedidoController.cancelarPedido);
 router.post('/pedido/:id/pagar-credito', PedidoController.pagarConCredito);
+router.post('/pedido/:id/reembolsar', PedidoController.reembolsarPedido);
 export default router;

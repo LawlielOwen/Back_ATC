@@ -176,5 +176,20 @@ static async crearPedidoDirecto(
         connection.release();
     }
 }
+static async reembolsarPedido(id_pedido: number): Promise<string> {
+        const connection = await pool.getConnection();
+        try {
+            await connection.query('CALL sp_reembolsar_pedido_incompleto(?, @mensaje)', [id_pedido]);
+            
+            const [[{ mensaje }]]: any = await connection.query('SELECT @mensaje AS mensaje');
 
+            if (mensaje && mensaje.startsWith('Error:')) {
+                throw new Error(mensaje);
+            }
+
+            return mensaje;
+        } finally {
+            connection.release();
+        }
+    }
 }

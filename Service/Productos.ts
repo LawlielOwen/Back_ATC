@@ -60,10 +60,31 @@ static async agregarProducto(p: Productos) {
             paginaActual: pagina
         }
     }
-    static async obtenerProductoPorId(id: number) {
-        const [rows]: any = await pool.query('select * from verProductos where id = ?', [id]);
-        return rows[0];
-    }
+static async obtenerProductoPorId(id: number) {
+    const [rows]: any = await pool.query('SELECT * FROM verProductos WHERE id = ?', [id]);
+    if (!rows || rows.length === 0) return null;
+
+    const producto = rows[0];
+
+    const [reservasRows]: any = await pool.query(`
+        SELECT 
+            IFNULL(SUM(CASE WHEN id_pedido IS NOT NULL THEN cantidad_reservada ELSE 0 END), 0) AS asignado,
+            IFNULL(SUM(CASE WHEN id_pedido IS NULL THEN cantidad_reservada ELSE 0 END), 0) AS no_asignado
+        FROM reservas_stock
+        WHERE id_producto = ? AND estatus = 'activa'
+    `, [id]);
+
+    const asignado = Number(reservasRows[0].asignado) || 0;
+    const noAsignado = Number(reservasRows[0].no_asignado) || 0;
+    const totalApartado = asignado + noAsignado;
+
+    return { 
+        ...producto, 
+        Apartado: totalApartado, 
+        ApartadoComprometido: asignado, 
+        ApartadoLibre: noAsignado 
+    };
+}
  
     static async eliminarProducto(id: number) {
         const [rows]: any = await pool.query('call sp_eliminar_producto(?)', [id]);
@@ -110,4 +131,5 @@ static async agregarProducto(p: Productos) {
         ]);
         return rows;
     }
+    
 }
