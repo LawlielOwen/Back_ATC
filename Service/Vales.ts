@@ -160,7 +160,7 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
     let vale: any;
     let detalles: any[] = [];
     let nombreSupervisor = '';
-
+let puestoSupervisor = 'ALMACÉN';
     try {
         // 1. Datos del vale y cotización de origen.
         const [vales]: any = await connection.query(`
@@ -235,44 +235,60 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
         vale = vales[0];
 
         // 2. Supervisor: administrador distinto del ID 1.
-        const [supervisores]: any = await connection.query(`
+       let [personal]: any = await connection.query(`
             SELECT
                 id,
+                Rol,
                 TRIM(CONCAT_WS(
                     ' ',
                     NULLIF(TRIM(Nombre), ''),
                     NULLIF(TRIM(app), ''),
                     NULLIF(TRIM(apm), '')
                 )) AS nombre_completo
-
             FROM asesores
-
-            WHERE Rol = ?
-              AND id <> ?
-
+            WHERE Rol = 'Almacen' AND id <> 1
             ORDER BY id
-        `, ['Administrador', 1]);
+            LIMIT 1
+        `);
 
-        if (supervisores.length === 0) {
+         puestoSupervisor = 'ALMACÉN';
+
+        if (personal.length === 0) {
+            [personal] = await connection.query(`
+                SELECT
+                    id,
+                    Rol,
+                    TRIM(CONCAT_WS(
+                        ' ',
+                        NULLIF(TRIM(Nombre), ''),
+                        NULLIF(TRIM(app), ''),
+                        NULLIF(TRIM(apm), '')
+                    )) AS nombre_completo
+                FROM asesores
+                WHERE Rol = 'Administrador' AND id <> 1
+                ORDER BY id
+                LIMIT 1
+            `);
+            puestoSupervisor = 'SUPERVISOR DE SUCURSAL';
+        }
+
+        if (personal.length === 0) {
             throw new Error(
-                'No hay un administrador supervisor registrado ' +
-                'distinto del usuario ID 1'
+                'No hay un encargado de Almacén ni un Administrador registrado distinto del usuario ID 1'
             );
         }
 
-        if (supervisores.length > 1) {
-            throw new Error(
-                'Hay varios administradores distintos del usuario ID 1. ' +
-                'Es necesario definir cuál es el supervisor de sucursal'
-            );
+        nombreSupervisor = personal[0].nombre_completo;
+        
+        // Ajustar el puesto según el rol encontrado
+        if (personal[0].Rol && personal[0].Rol.toLowerCase() === 'administrador') {
+            puestoSupervisor = 'SUPERVISOR DE SUCURSAL';
+        } else {
+            puestoSupervisor = 'ALMACÉN';
         }
-
-        nombreSupervisor = supervisores[0].nombre_completo;
 
         if (!nombreSupervisor) {
-            throw new Error(
-                'El supervisor no tiene un nombre registrado'
-            );
+            throw new Error('El responsable seleccionado no tiene un nombre registrado');
         }
 
         // 3. Productos, demos y partidas manuales.
@@ -492,7 +508,8 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
         observacion_general: '',
 
         nombre_asesor: escapeHtml(nombreAsesorConTitulo),
-        nombre_supervisor: escapeHtml(nombreSupervisor)
+        nombre_supervisor: escapeHtml(nombreSupervisor),
+        puesto_supervisor: escapeHtml(puestoSupervisor)
     };
 
     const htmlPlantilla = fs.readFileSync(
