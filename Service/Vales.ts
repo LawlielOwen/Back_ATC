@@ -428,7 +428,7 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
     // 6. Plantilla y recursos.
     const rutaPlantilla = path.join(
         __dirname,
-        '../Template/PlantillaVale.html'
+        '../Template/Plantillavale.html'
     );
 
     const rutaLogo = path.join(
