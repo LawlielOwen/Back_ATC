@@ -415,4 +415,26 @@ static async asignarFolio(req: any, res: any) {
             return res.status(500).json({ error: 'Error interno del servidor al asignar el folio manual' });
         }
     }
+    static async asignarFolioCotizacion(req: any, res: any) {
+        try {
+            const { id_vale, folio } = req.body;
+
+            if (!id_vale || !folio) {
+                return res.status(400).json({ error: 'El ID del vale y el folio son obligatorios' });
+            }
+
+            const result = await ValeService.asignarFolioCotizacionManual(id_vale, folio);
+
+            if (result.resultado === 'ERROR') {
+                return res.status(409).json({ error: result.mensaje });
+            }
+
+            io.to('rol_Almacen').to('rol_Administrador').emit('actualizar_tabla_vales');
+            return res.status(200).json({ message: result.mensaje });
+            
+        } catch (error: any) {
+            console.error('Error en asignarFolioCotizacion:', error);
+            return res.status(500).json({ error: 'Error interno del servidor al asignar folio de cotización' });
+        }
+    }
 }

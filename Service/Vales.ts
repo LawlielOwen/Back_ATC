@@ -150,6 +150,10 @@ static async verificarFolioValeExistente(folioCandidato: string) {
     valeExistente: rows.length > 0 ? rows[0] : null
   };
 }
+static async asignarFolioCotizacionManual(id_vale: number, folio: string) {
+        const [rows]: any = await pool.query('CALL sp_asignar_folio_cotizacion_manual(?, ?)', [id_vale, folio]);
+        return rows[0][0]; 
+    }
 static async asignarFolioManual(id_vale: number, folio: string) {
         const [rows]: any = await pool.query('CALL sp_asignar_folio_manual(?, ?)', [id_vale, folio]);
         return rows[0][0]; 
@@ -182,7 +186,8 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
 
                 COALESCE(
                     NULLIF(TRIM(cp.num_cotizacion), ''),
-                    NULLIF(TRIM(cv.num_cotizacion), '')
+                    NULLIF(TRIM(cv.num_cotizacion), ''),
+                    NULLIF(TRIM(v.folio_cotizacion_manual), '')
                 ) AS num_cotizacion,
 
                 COALESCE(
@@ -576,19 +581,16 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
             const grupos = [];
             const modos = ['normal', 'compacto', 'muy-compacto'];
 
-            const crearContenido = (destino) => {
-                const contenido = plantilla.cloneNode(true);
-                contenido.removeAttribute('id');
-                contenido.className = 'vale-contenido';
-                contenido.querySelectorAll('.vale-copia').forEach(el => el.remove());
-                const titulos = contenido.querySelector('.vale-header-titulos');
-                if (!titulos) throw new Error('Falta el encabezado del vale');
-                const etiqueta = document.createElement('div');
-                etiqueta.className = 'vale-copia';
-                etiqueta.textContent = 'COPIA PARA ' + destino;
-                titulos.appendChild(etiqueta);
-                return contenido;
-            };
+          const crearContenido = () => {
+    const contenido = plantilla.cloneNode(true);
+    contenido.removeAttribute('id');
+    contenido.className = 'vale-contenido';
+
+    contenido.querySelectorAll('.vale-copia')
+        .forEach(el => el.remove());
+
+    return contenido;
+};
 
             const cabe = (contenido, mitad) => {
                 const estilo = getComputedStyle(mitad);
@@ -613,7 +615,7 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
                 hoja.append(superior, inferior, corte);
                 original.appendChild(hoja);
 
-                const asesor = crearContenido('EL ASESOR');
+                const asesor = crearContenido();
                 superior.appendChild(asesor);
                 await Promise.all(Array.from(asesor.querySelectorAll('img'), img => img.decode()));
                 const cuerpo = asesor.querySelector('.items-table tbody');
@@ -645,21 +647,29 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
                 }
 
                 const almacen = asesor.cloneNode(true);
-                almacen.querySelector('.vale-copia').textContent = 'COPIA PARA ALMACÉN';
-                inferior.appendChild(almacen);
-                await Promise.all(Array.from(almacen.querySelectorAll('img'), img => img.decode()));
-                grupos.push({ asesor, almacen, superior, inferior });
-                inicio += cantidad;
+inferior.appendChild(almacen);
+
+await Promise.all(
+    Array.from(
+        almacen.querySelectorAll('img'),
+        img => img.decode()
+    )
+);
+
+grupos.push({ asesor, almacen, superior, inferior });
+inicio += cantidad;
             } while (inicio < filas.length);
 
-            grupos.forEach((grupo, indice) => {
-                const numero = ' · ' + (indice + 1) + ' / ' + grupos.length;
-                grupo.asesor.querySelector('.vale-copia').textContent = 'COPIA PARA EL ASESOR' + numero;
-                grupo.almacen.querySelector('.vale-copia').textContent = 'COPIA PARA ALMACÉN' + numero;
-                if (!cabe(grupo.asesor, grupo.superior) || !cabe(grupo.almacen, grupo.inferior)) {
-                    throw new Error('El contenido excede el espacio de media hoja');
-                }
-            });
+          grupos.forEach((grupo) => {
+    if (
+        !cabe(grupo.asesor, grupo.superior) ||
+        !cabe(grupo.almacen, grupo.inferior)
+    ) {
+        throw new Error(
+            'El contenido excede el espacio de media hoja'
+        );
+    }
+});
         })()`);
 
         const pdfBuffer = await page.pdf({
