@@ -571,13 +571,16 @@ let puestoSupervisor = 'ALMACÉN';
                     margin: 12mm;
                 }
 
-                .vale-hoja {
-                    display: flow-root;
-                    width: 100%;
-                    height: auto;
-                    overflow: visible;
-                }
-
+               .vale-copia {
+    margin-top: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    height: 14px;
+    text-align: center;
+    white-space: nowrap;
+    color: #000;
+}
                 .vale-hoja + .vale-hoja {
                     break-before: page;
                     page-break-before: always;
@@ -786,23 +789,34 @@ let puestoSupervisor = 'ALMACÉN';
             original.replaceChildren();
 
             const crearHoja = async () => {
-                const hoja = plantilla.cloneNode(true);
+    const hoja = plantilla.cloneNode(true);
 
-                hoja.removeAttribute('id');
-                hoja.classList.add('vale-hoja');
-                hoja.dataset.densidad = 'normal';
+    hoja.removeAttribute('id');
+    hoja.classList.add('vale-hoja');
+    hoja.dataset.densidad = 'normal';
 
-                original.appendChild(hoja);
+    const titulos = hoja.querySelector('.vale-header-titulos');
 
-                await Promise.all(
-                    Array.from(
-                        hoja.querySelectorAll('img'),
-                        imagen => imagen.decode()
-                    )
-                );
+    if (!titulos) {
+        throw new Error('No se encontró el encabezado del vale');
+    }
 
-                return hoja;
-            };
+    const etiqueta = document.createElement('div');
+    etiqueta.className = 'vale-copia';
+    etiqueta.textContent = 'COPIA PARA EL ASESOR';
+    titulos.appendChild(etiqueta);
+
+    original.appendChild(hoja);
+
+    await Promise.all(
+        Array.from(
+            hoja.querySelectorAll('img'),
+            imagen => imagen.decode()
+        )
+    );
+
+    return hoja;
+};
 
             const ajustarHoja = (hoja) => {
                 for (const modo of modos) {
@@ -921,7 +935,52 @@ let puestoSupervisor = 'ALMACÉN';
                 inicio += cantidad;
             }
         })()`);
+        
+// Genera las dos copias completas dentro del mismo PDF.
+await page.evaluate(`(async () => {
+    const contenedor = document.getElementById('vale');
 
+    if (!contenedor) {
+        throw new Error('No se encontró el contenedor del vale');
+    }
+
+    // Captura únicamente las hojas originales, antes de duplicarlas.
+    const hojasAsesor = Array.from(contenedor.children)
+        .filter(elemento => elemento.classList.contains('vale-hoja'));
+
+    if (hojasAsesor.length === 0) {
+        throw new Error('No se generaron páginas para el vale');
+    }
+
+    const totalHojas = hojasAsesor.length;
+
+    hojasAsesor.forEach((hoja, indice) => {
+        const etiquetaAsesor = hoja.querySelector('.vale-copia');
+
+        if (!etiquetaAsesor) {
+            throw new Error('Falta la identificación de la copia');
+        }
+
+        etiquetaAsesor.textContent =
+            'COPIA PARA EL ASESOR · Página ' +
+            (indice + 1) + ' de ' + totalHojas;
+
+        const hojaAlmacen = hoja.cloneNode(true);
+        const etiquetaAlmacen = hojaAlmacen.querySelector('.vale-copia');
+
+        etiquetaAlmacen.textContent =
+            'COPIA PARA ALMACÉN · Página ' +
+            (indice + 1) + ' de ' + totalHojas;
+
+        contenedor.appendChild(hojaAlmacen);
+    });
+
+    await document.fonts.ready;
+
+    await Promise.all(
+        Array.from(document.images, imagen => imagen.decode())
+    );
+})()`);
         const pdfBuffer = await page.pdf({
             format: 'Letter',
             landscape: true,
