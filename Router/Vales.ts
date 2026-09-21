@@ -14,6 +14,7 @@ router.get('/vales/verificar-folio', ValeController.verificarFolioVale);
 router.get('/vales/cotizaciones/disponibles-vale', ValeController.cotizacionesDisponiblesVale);
 router.get('/vales/cotizaciones/:id_cotizacion/productos', ValeController.productosCotizacionVale);
 router.post('/vales/cotizaciones', ValeController.solicitarValeDesdeCotizacion);
+router.put('/vales/asignar-folio', ValeController.asignarFolio);
 
 router.get('/vales/visitas/disponibles-vale/:id_tecnico', ValeController.visitasDisponiblesVale);
 router.post('/vales/demo', ValeController.solicitarValeDemo);

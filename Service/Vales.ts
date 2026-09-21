@@ -150,6 +150,10 @@ static async verificarFolioValeExistente(folioCandidato: string) {
     valeExistente: rows.length > 0 ? rows[0] : null
   };
 }
+static async asignarFolioManual(id_vale: number, folio: string) {
+        const [rows]: any = await pool.query('CALL sp_asignar_folio_manual(?, ?)', [id_vale, folio]);
+        return rows[0][0]; 
+    }
 static async generarPDFvale(id_vale: number): Promise<Buffer> {
     if (!Number.isInteger(id_vale) || id_vale <= 0) {
         throw new Error('El ID del vale no es válido');
@@ -160,7 +164,7 @@ static async generarPDFvale(id_vale: number): Promise<Buffer> {
     let vale: any;
     let detalles: any[] = [];
     let nombreSupervisor = '';
-let puestoSupervisor = 'ALMACÉN';
+    let puestoSupervisor = 'ALMACÉN';
     try {
         // 1. Datos del vale y cotización de origen.
         const [vales]: any = await connection.query(`
@@ -530,13 +534,10 @@ let puestoSupervisor = 'ALMACÉN';
         }
     );
 
-    // 7. Generación del PDF.
+    // 7. Carta vertical: asesor arriba y almacén abajo.
     const browser = await puppeteer.launch({
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox'
-        ],
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
         ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
         })
@@ -544,460 +545,135 @@ let puestoSupervisor = 'ALMACÉN';
 
     try {
         const page = await browser.newPage();
-
-        const anchoUtilPx = Math.floor(
-            (11 - (24 / 25.4)) * 96
-        );
-
-        const altoUtilPx = Math.floor(
-            (8.5 - (24 / 25.4)) * 96
-        );
-
-        await page.setViewport({
-            width: anchoUtilPx,
-            height: altoUtilPx
-        });
-
+        await page.setViewport({ width: 816, height: 1056 });
         await page.emulateMediaType('print');
+        await page.setContent(htmlListo, { waitUntil: 'load' });
 
-        await page.setContent(htmlListo, {
-            waitUntil: 'load'
-        });
-
-        await page.addStyleTag({
-            content: `
-                @page {
-                    size: letter landscape;
-                    margin: 12mm;
-                }
-
-               .vale-copia {
-    margin-top: 4px;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 14px;
-    height: 14px;
-    text-align: center;
-    white-space: nowrap;
-    color: #000;
-}
-                .vale-hoja + .vale-hoja {
-                    break-before: page;
-                    page-break-before: always;
-                }
-
-                .items-table {
-                    width: 100%;
-                    table-layout: fixed;
-                    border-collapse: collapse;
-                    border: 0.5px solid #000;
-                }
-
-                .items-table th,
-                .items-table td {
-                    text-align: center !important;
-                    vertical-align: middle !important;
-                    overflow-wrap: anywhere;
-                }
-
-                .items-table th {
-                    border: 0.5px solid #000;
-                }
-
-                .items-table td {
-                    border-left: 0.5px solid #000;
-                    border-right: 0.5px solid #000;
-                    border-top: 0.5px dotted #666;
-                    border-bottom: 0.5px dotted #666;
-                }
-
-                .items-table tbody tr:last-child td {
-                    border-bottom: 0.5px solid #000;
-                }
-
-                .items-table thead {
-                    display: table-header-group;
-                }
-
-                .items-table tr,
-                .vale-footer {
-                    break-inside: avoid;
-                    page-break-inside: avoid;
-                }
-
-                /* Compacto: conserva el tamaño de letra. */
-                .vale-hoja[data-densidad="compacto"] .logo-atc {
-                    max-height: 65px;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .vale-header {
-                    margin-bottom: 8px;
-                    padding-bottom: 5px;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .vale-datos-fila {
-                    margin: 8px 0;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .items-table {
-                    margin-top: 6px;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .items-table th {
-                    padding: 3px 4px;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .items-table td {
-                    padding: 2px 4px;
-                    line-height: 1.15;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .vale-footer {
-                    margin-top: 16px;
-                }
-
-                .vale-hoja[data-densidad="compacto"] .firma-titulo {
-                    margin-bottom: 28px;
-                }
-
-                /* Muy compacto: tabla con letra de 9 px. */
-                .vale-hoja[data-densidad="muy-compacto"] .logo-atc {
-                    max-height: 52px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .vale-header {
-                    margin-bottom: 6px;
-                    padding-bottom: 4px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .titulo-empresa {
-                    font-size: 14px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .titulo-sucursal,
-                .vale-hoja[data-densidad="muy-compacto"] .titulo-vale {
-                    font-size: 11px;
-                    margin-top: 2px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .vale-datos-fila {
-                    margin: 6px 0;
-                    font-size: 10px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .items-table {
-                    margin-top: 4px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .items-table th {
-                    font-size: 9px;
-                    padding: 2px 4px;
-                    line-height: 1.1;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .items-table td {
-                    font-size: 9px;
-                    padding: 1px 4px;
-                    line-height: 1.1;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .fila-vacia td {
-                    height: 14px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .vale-footer {
-                    margin-top: 12px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .firma-titulo {
-                    font-size: 9px;
-                    margin-bottom: 24px;
-                }
-
-                .vale-hoja[data-densidad="muy-compacto"] .firma-nombre {
-                    font-size: 9px;
-                }
-            `
-        });
-
-        // Espera las fuentes y el logo antes de medir.
+        // JavaScript ejecutado en Chromium, sin requerir tipos DOM en el backend.
         await page.evaluate(`(async () => {
             const fuentes = await Promise.all([
-                document.fonts.load('400 10px "CotizacionPDF"'),
-                document.fonts.load('700 10px "CotizacionPDF"')
+                document.fonts.load('400 9px "CotizacionPDF"'),
+                document.fonts.load('700 9px "CotizacionPDF"')
             ]);
-
             await document.fonts.ready;
-
             if (fuentes.some(grupo => grupo.length === 0)) {
                 throw new Error('No se cargaron las fuentes del vale');
             }
-
-            await Promise.all(
-                Array.from(
-                    document.images,
-                    imagen => imagen.decode()
-                )
-            );
-        })()`);
-
-        // 8. Paginación: máximo 30 partidas por hoja.
-        await page.evaluate(`(async () => {
-            const MAX_PRODUCTOS = 30;
-            const TOTAL_PRODUCTOS = ${detalles.length};
-            const ALTO_DISPONIBLE = ${altoUtilPx} - 12;
-            const ANCHO_DISPONIBLE = ${anchoUtilPx};
-
-            const modos = [
-                'normal',
-                'compacto',
-                'muy-compacto'
-            ];
+            await Promise.all(Array.from(document.images, img => img.decode()));
 
             const original = document.getElementById('vale');
+            if (!original) throw new Error('No se encontró el contenedor #vale');
+            const tabla = original.querySelector('.items-table tbody');
+            if (!tabla) throw new Error('No se encontró la tabla del vale');
 
-            if (!original) {
-                throw new Error('No se encontró el contenedor #vale');
+            const filas = Array.from(tabla.querySelectorAll('tr.fila-producto'));
+            const relleno = Array.from(tabla.querySelectorAll('tr.fila-vacia'));
+            if (filas.length !== ${detalles.length} || filas.some(f => f.cells.length !== 6)) {
+                throw new Error('La tabla no coincide con las partidas del vale');
             }
-
-            const cuerpoOriginal = original.querySelector(
-                '.items-table tbody'
-            );
-
-            if (!cuerpoOriginal) {
-                throw new Error('No se encontró la tabla del vale');
-            }
-
-            const filasProductos = Array.from(
-                cuerpoOriginal.querySelectorAll('tr.fila-producto')
-            );
-
-            const filasRelleno = Array.from(
-                cuerpoOriginal.querySelectorAll('tr.fila-vacia')
-            );
-
-            if (
-                filasProductos.length !== TOTAL_PRODUCTOS ||
-                filasProductos.some(fila => fila.cells.length !== 6)
-            ) {
-                throw new Error(
-                    'La tabla no coincide con las partidas del vale'
-                );
-            }
-
             const plantilla = original.cloneNode(true);
             original.replaceChildren();
+            const grupos = [];
+            const modos = ['normal', 'compacto', 'muy-compacto'];
 
-            const crearHoja = async () => {
-    const hoja = plantilla.cloneNode(true);
-
-    hoja.removeAttribute('id');
-    hoja.classList.add('vale-hoja');
-    hoja.dataset.densidad = 'normal';
-
-    const titulos = hoja.querySelector('.vale-header-titulos');
-
-    if (!titulos) {
-        throw new Error('No se encontró el encabezado del vale');
-    }
-
-    const etiqueta = document.createElement('div');
-    etiqueta.className = 'vale-copia';
-    etiqueta.textContent = 'COPIA PARA EL ASESOR';
-    titulos.appendChild(etiqueta);
-
-    original.appendChild(hoja);
-
-    await Promise.all(
-        Array.from(
-            hoja.querySelectorAll('img'),
-            imagen => imagen.decode()
-        )
-    );
-
-    return hoja;
-};
-
-            const ajustarHoja = (hoja) => {
-                for (const modo of modos) {
-                    hoja.dataset.densidad = modo;
-
-                    const rect = hoja.getBoundingClientRect();
-
-                    const alto = Math.max(
-                        rect.height,
-                        hoja.scrollHeight
-                    );
-
-                    const ancho = Math.max(
-                        rect.width,
-                        hoja.scrollWidth
-                    );
-
-                    if (
-                        alto <= ALTO_DISPONIBLE &&
-                        ancho <= ANCHO_DISPONIBLE + 1
-                    ) {
-                        return true;
-                    }
-                }
-
-                return false;
+            const crearContenido = (destino) => {
+                const contenido = plantilla.cloneNode(true);
+                contenido.removeAttribute('id');
+                contenido.className = 'vale-contenido';
+                contenido.querySelectorAll('.vale-copia').forEach(el => el.remove());
+                const titulos = contenido.querySelector('.vale-header-titulos');
+                if (!titulos) throw new Error('Falta el encabezado del vale');
+                const etiqueta = document.createElement('div');
+                etiqueta.className = 'vale-copia';
+                etiqueta.textContent = 'COPIA PARA ' + destino;
+                titulos.appendChild(etiqueta);
+                return contenido;
             };
 
-            // Vale sin productos: conserva el comentario en la primera fila.
-            if (TOTAL_PRODUCTOS === 0) {
-                const hoja = await crearHoja();
-
-                if (!ajustarHoja(hoja)) {
-                    const relleno = Array.from(
-                        hoja.querySelectorAll('.fila-vacia')
-                    );
-
-                    // Conserva la primera fila, que puede tener comentario.
-                    relleno.slice(1).forEach(fila => fila.remove());
-
-                    if (!ajustarHoja(hoja)) {
-                        throw new Error(
-                            'El contenido del vale supera una página. ' +
-                            'No se ha recortado el texto.'
-                        );
-                    }
-                }
-
-                return;
-            }
+            const cabe = (contenido, mitad) => {
+                const estilo = getComputedStyle(mitad);
+                const limiteAlto = mitad.getBoundingClientRect().height
+                    - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom) - 2;
+                const limiteAncho = mitad.getBoundingClientRect().width
+                    - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+                return Math.max(contenido.scrollHeight, contenido.getBoundingClientRect().height) <= limiteAlto
+                    && contenido.scrollWidth <= limiteAncho + 1;
+            };
 
             let inicio = 0;
+            do {
+                const hoja = document.createElement('section');
+                hoja.className = 'hoja-carta';
+                const superior = document.createElement('div');
+                superior.className = 'mitad-vale mitad-asesor';
+                const inferior = document.createElement('div');
+                inferior.className = 'mitad-vale mitad-almacen';
+                const corte = document.createElement('div');
+                corte.className = 'linea-corte';
+                hoja.append(superior, inferior, corte);
+                original.appendChild(hoja);
 
-            while (inicio < TOTAL_PRODUCTOS) {
-                const hoja = await crearHoja();
-                const tbody = hoja.querySelector('.items-table tbody');
+                const asesor = crearContenido('EL ASESOR');
+                superior.appendChild(asesor);
+                await Promise.all(Array.from(asesor.querySelectorAll('img'), img => img.decode()));
+                const cuerpo = asesor.querySelector('.items-table tbody');
+                let cantidad = Math.min(30, filas.length - inicio);
+                let ajustado = false;
 
-                let cantidad = Math.min(
-                    MAX_PRODUCTOS,
-                    TOTAL_PRODUCTOS - inicio
-                );
-
-                let cabe = false;
-
-                while (cantidad > 0) {
-                    tbody.replaceChildren();
-
-                    for (
-                        let i = inicio;
-                        i < inicio + cantidad;
-                        i++
-                    ) {
-                        tbody.appendChild(
-                            filasProductos[i].cloneNode(true)
-                        );
+                while (!ajustado) {
+                    cuerpo.replaceChildren();
+                    filas.slice(inicio, inicio + cantidad).forEach(f => cuerpo.appendChild(f.cloneNode(true)));
+                    if (inicio === 0 && cantidad === filas.length) {
+                        relleno.forEach(f => cuerpo.appendChild(f.cloneNode(true)));
                     }
-
-                    // Relleno solo para vales cortos completos.
-                    if (
-                        inicio === 0 &&
-                        cantidad === TOTAL_PRODUCTOS &&
-                        TOTAL_PRODUCTOS < 10
-                    ) {
-                        filasRelleno.forEach(fila => {
-                            tbody.appendChild(fila.cloneNode(true));
-                        });
+                    for (const modo of modos) {
+                        asesor.dataset.densidad = modo;
+                        if (cabe(asesor, inferior)) { ajustado = true; break; }
                     }
-
-                    cabe = ajustarHoja(hoja);
-
-                    // Retira filas vacías antes de mover productos.
-                    if (!cabe) {
-                        tbody.querySelectorAll('.fila-vacia')
-                            .forEach(fila => fila.remove());
-
-                        cabe = ajustarHoja(hoja);
+                    if (!ajustado) {
+                        // Conserva el primer renglón en vales sin productos: puede contener comentario.
+                        Array.from(cuerpo.querySelectorAll('.fila-vacia'))
+                            .forEach((f, i) => { if (filas.length > 0 || i > 0) f.remove(); });
+                        ajustado = cabe(asesor, inferior);
                     }
-
-                    if (cabe) {
-                        break;
+                    if (!ajustado) {
+                        if (cantidad <= 1) {
+                            throw new Error('Una partida o el encabezado supera media hoja. No se ha recortado el contenido.');
+                        }
+                        cantidad--;
                     }
-
-                    // Si el texto es extenso, mueve la última partida
-                    // a la página siguiente.
-                    cantidad--;
                 }
 
-                if (!cabe) {
-                    throw new Error(
-                        'La partida ' + (inicio + 1) +
-                        ' contiene demasiado texto para una hoja. ' +
-                        'No se ha recortado su contenido.'
-                    );
-                }
-
+                const almacen = asesor.cloneNode(true);
+                almacen.querySelector('.vale-copia').textContent = 'COPIA PARA ALMACÉN';
+                inferior.appendChild(almacen);
+                await Promise.all(Array.from(almacen.querySelectorAll('img'), img => img.decode()));
+                grupos.push({ asesor, almacen, superior, inferior });
                 inicio += cantidad;
-            }
+            } while (inicio < filas.length);
+
+            grupos.forEach((grupo, indice) => {
+                const numero = ' · ' + (indice + 1) + ' / ' + grupos.length;
+                grupo.asesor.querySelector('.vale-copia').textContent = 'COPIA PARA EL ASESOR' + numero;
+                grupo.almacen.querySelector('.vale-copia').textContent = 'COPIA PARA ALMACÉN' + numero;
+                if (!cabe(grupo.asesor, grupo.superior) || !cabe(grupo.almacen, grupo.inferior)) {
+                    throw new Error('El contenido excede el espacio de media hoja');
+                }
+            });
         })()`);
-        
-// Genera las dos copias completas dentro del mismo PDF.
-await page.evaluate(`(async () => {
-    const contenedor = document.getElementById('vale');
 
-    if (!contenedor) {
-        throw new Error('No se encontró el contenedor del vale');
-    }
-
-    // Captura únicamente las hojas originales, antes de duplicarlas.
-    const hojasAsesor = Array.from(contenedor.children)
-        .filter(elemento => elemento.classList.contains('vale-hoja'));
-
-    if (hojasAsesor.length === 0) {
-        throw new Error('No se generaron páginas para el vale');
-    }
-
-    const totalHojas = hojasAsesor.length;
-
-    hojasAsesor.forEach((hoja, indice) => {
-        const etiquetaAsesor = hoja.querySelector('.vale-copia');
-
-        if (!etiquetaAsesor) {
-            throw new Error('Falta la identificación de la copia');
-        }
-
-        etiquetaAsesor.textContent =
-            'COPIA PARA EL ASESOR · Página ' +
-            (indice + 1) + ' de ' + totalHojas;
-
-        const hojaAlmacen = hoja.cloneNode(true);
-        const etiquetaAlmacen = hojaAlmacen.querySelector('.vale-copia');
-
-        etiquetaAlmacen.textContent =
-            'COPIA PARA ALMACÉN · Página ' +
-            (indice + 1) + ' de ' + totalHojas;
-
-        contenedor.appendChild(hojaAlmacen);
-    });
-
-    await document.fonts.ready;
-
-    await Promise.all(
-        Array.from(document.images, imagen => imagen.decode())
-    );
-})()`);
         const pdfBuffer = await page.pdf({
             format: 'Letter',
-            landscape: true,
+            landscape: false,
             preferCSSPageSize: true,
             printBackground: true,
             scale: 1,
-            margin: {
-                top: '12mm',
-                bottom: '12mm',
-                left: '12mm',
-                right: '12mm'
-            }
+            margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' }
         });
-
         return Buffer.from(pdfBuffer);
     } finally {
         await browser.close();
     }
 }
+
 }
