@@ -3,12 +3,13 @@ import { Productos } from '../Model/Productos'
 
 export class ProductoService {
 static async agregarProducto(p: Productos) {
-        const { 
-            Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
-            Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
-        } = p;
+    const { 
+        Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
+        Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
+    } = p;
 
-        const [rows]: any = await pool.query('call sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?)', [
+    try {
+        const [rows]: any = await pool.query('CALL sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?)', [
             Nombre, 
             Descripcion, 
             ExtraDescripcion || null, 
@@ -22,8 +23,13 @@ static async agregarProducto(p: Productos) {
             id_marca 
         ]);
         return rows;
+    } catch (error: any) {
+        if (error.sqlMessage && error.sqlMessage.includes('Error:')) {
+            throw new Error(error.sqlMessage);
+        }
+        throw new Error('Error al registrar el producto en la base de datos.');
     }
-
+}
     static async modificarProducto(id: Number, p: Productos) {
         const { 
             Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 

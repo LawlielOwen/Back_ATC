@@ -27,16 +27,21 @@ export class ProductoController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-    static async agregarProducto(req: any, res: Response) {
-        try {
-            const producto = req.body;
-            const result = await ProductoService.agregarProducto(producto);
-            res.status(201).json(result);
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+  static async agregarProducto(req: any, res: Response) {
+    try {
+        const producto = req.body;
+        const result = await ProductoService.agregarProducto(producto);
+        res.status(201).json(result);
+    } catch (error: any) {
+        console.error(error);
+        
+        if (error.message && error.message.includes('Error:')) {
+            return res.status(400).json({ error: error.message });
         }
+
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
+}
     static async actualizarProducto(req: Request, res: Response) {
         try {
             const id = parseInt(req.params.id as string);
