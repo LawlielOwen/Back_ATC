@@ -14,7 +14,7 @@ router.get('/pedido/:id', PedidoController.obtenerDetalles);
 router.post('/pedido/:id/factura', uploadRecibo.single('factura'), PedidoController.subirFactura);
 
 router.post('/pedido/:id/aceptar', PedidoController.aceptarPedido);
-
+router.put('/pedido/:id/modificar', PedidoController.modificarPedido);
 router.post('/pedido/:id/cancelar', PedidoController.cancelarPedido);
 router.post('/pedido/:id/pagar-credito', PedidoController.pagarConCredito);
 router.post('/pedido/:id/reembolsar', PedidoController.reembolsarPedido);

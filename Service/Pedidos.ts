@@ -192,4 +192,31 @@ static async reembolsarPedido(id_pedido: number): Promise<string> {
             connection.release();
         }
     }
+    static async modificarPedido(
+        id_pedido: number,
+        orden_compra: string | null,
+        detalles: any[]
+    ): Promise<{ error?: string; mensaje?: string }> {
+        
+        const detallesJSON = JSON.stringify(detalles);
+        const connection = await pool.getConnection();
+
+        try {
+            await connection.query(
+                'CALL sp_modificar_pedido(?, ?, ?, @p_mensaje)',
+                [id_pedido, orden_compra, detallesJSON]
+            );
+
+            const [outRows]: any = await connection.query('SELECT @p_mensaje AS mensaje');
+            const mensaje = outRows[0].mensaje;
+
+            if (mensaje.startsWith('Error:')) {
+                return { error: mensaje };
+            }
+
+            return { mensaje };
+        } finally {
+            connection.release();
+        }
+    }
 }

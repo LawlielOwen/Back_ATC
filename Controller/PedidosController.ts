@@ -238,4 +238,34 @@ static async reembolsarPedido(req: Request, res: Response) {
             return res.status(500).json({ error: 'Error interno del servidor al procesar el reembolso del pedido.' });
         }
     }
+    static async modificarPedido(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { orden_compra, detalles } = req.body;
+
+            if (!id || isNaN(Number(id))) {
+                return res.status(400).json({ error: 'ID de pedido inválido.' });
+            }
+
+            if (!Array.isArray(detalles) || detalles.length === 0) {
+                return res.status(400).json({ error: 'El pedido debe tener al menos un producto.' });
+            }
+
+            const result = await PedidoService.modificarPedido(
+                Number(id), 
+                orden_compra || null, 
+                detalles
+            );
+
+            if (result.error) {
+                return res.status(400).json({ error: result.error });
+            }
+
+            return res.status(200).json({ message: result.mensaje });
+            
+        } catch (error: any) {
+            console.error('Error en modificarPedido:', error);
+            return res.status(500).json({ error: 'Error interno del servidor al modificar el pedido.' });
+        }
+    }
 }
