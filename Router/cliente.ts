@@ -50,4 +50,6 @@ router.delete('/clientes/:id', ClienteController.eliminarCliente);
 router.put('/clientes/:id/activar', ClienteController.activarCliente);
 router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), validarPDFReal, ClienteController.subirCSF);
 router.put('/clientes/:id/credito', ClienteController.asignarCredito);
+router.post('/clientes/:id/credito/pago',ClienteController.registrarPagoCredito);
+router.get('/clientes/:id/credito/movimientos',ClienteController.obtenerMovimientosCredito);
 export default router;

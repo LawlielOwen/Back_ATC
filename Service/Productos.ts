@@ -128,14 +128,25 @@ static async obtenerProductoPorId(id: number) {
     const [rows]: any = await pool.query('CALL sp_buscar_producto_por_codigo(?)', [termino]);
     return rows[0];
     }
-   static async registrarEntradaProducto(codigo: string, cantidad: number, destino: string, id_asesor: number) {
-        const [rows]: any = await pool.query('CALL sp_registrar_entrada_producto(?, ?, ?, ?)', [
+   static async registrarEntradaProducto(
+    codigo: string,
+    cantidad: number,
+    destino: string,
+    id_asesor: number,
+    requestId: string
+) {
+    const [rows]: any = await pool.query(
+        'CALL sp_registrar_entrada_producto(?, ?, ?, ?, ?)',
+        [
             codigo,
             cantidad,
             destino,
-            id_asesor
-        ]);
-        return rows;
-    }
+            id_asesor,
+            requestId
+        ]
+    );
+
+    return rows;
+}
     
 }

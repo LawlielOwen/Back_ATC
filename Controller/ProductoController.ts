@@ -116,18 +116,48 @@ export class ProductoController {
     }
     }
 static async registrarEntradaProducto(req: Request, res: Response) {
-        try {
-            const { codigo, cantidad, destino,id_asesor } = req.body;
-            if (!codigo || !cantidad || cantidad <= 0 || !destino) {
-                return res.status(400).json({ error: 'Código, cantidad (mayor a 0) y destino son obligatorios' });
-            }
-            const destinoNormalizado = destino.toLowerCase() === 'pedido' ? 'Pedido' : 'Almacen';
-            const result = await ProductoService.registrarEntradaProducto(codigo, parseInt(cantidad), destinoNormalizado,parseInt(id_asesor));
-            
-            res.status(200).json(result);
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ error: 'Error interno del servidor' });
+    try {
+        const { codigo, cantidad, destino, id_asesor, requestId } = req.body;
+
+        if (!codigo || !cantidad || cantidad <= 0 || !destino) {
+            return res.status(400).json({
+                error: 'Código, cantidad (mayor a 0) y destino son obligatorios'
+            });
         }
+
+        if (!requestId || typeof requestId !== 'string' || requestId.trim().length !== 36) {
+            return res.status(400).json({
+                error: 'El identificador único de la operación no es válido'
+            });
+        }
+
+        if (!id_asesor || isNaN(Number(id_asesor))) {
+            return res.status(400).json({
+                error: 'El asesor responsable es obligatorio'
+            });
+        }
+
+        const destinoNormalizado =
+            destino.toLowerCase() === 'pedido'
+                ? 'Pedido'
+                : 'Almacen';
+
+        const result = await ProductoService.registrarEntradaProducto(
+            codigo,
+            parseInt(cantidad),
+            destinoNormalizado,
+            parseInt(id_asesor),
+            requestId.trim()
+        );
+
+        res.status(200).json(result);
+
+    } catch (error: any) {
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
     }
+}
 }

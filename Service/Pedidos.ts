@@ -142,16 +142,16 @@ static async crearPedidoDirecto(
     moneda: string,
     tipo_cambio: number,
     vigencia_dias: number,
-    detalles: any[]
+    detalles: any[],
+    requestId: string
 ): Promise<{ id_pedido: number; mensaje: string }> {
 
     const detallesJSON = JSON.stringify(detalles);
-
     const connection = await pool.getConnection();
 
     try {
         await connection.query(
-            'CALL sp_crear_pedido_directo(?, ?, ?, ?, ?, ?, ?, @p_id_pedido, @p_mensaje)',
+            'CALL sp_crear_pedido_directo(?, ?, ?, ?, ?, ?, ?, ?, @p_id_pedido, @p_mensaje)',
             [
                 id_cliente,
                 id_asesor,
@@ -159,7 +159,8 @@ static async crearPedidoDirecto(
                 moneda,
                 tipo_cambio,
                 vigencia_dias,
-                detallesJSON
+                detallesJSON,
+                requestId
             ]
         );
 

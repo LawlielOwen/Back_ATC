@@ -16,18 +16,32 @@ export class MovimientoService {
         }
 
     }
-    static async registrarSalidaProducto(codigo: string, cantidad: number, destino: string, id_asesor: number | null,
-         id_cliente: number | null, clienteNoRegistrado: string | null) {
-        const [rows]: any = await pool.query('CALL sp_registrar_salida_producto(?, ?, ?, ?, ?, ?)', [
+ static async registrarSalidaProducto(
+    codigo: string,
+    cantidad: number,
+    destino: string,
+    id_asesor: number | null,
+    id_cliente: number | null,
+    clienteNoRegistrado: string | null,
+    motivoSalida: string | null,
+    requestId: string
+) {
+    const [rows]: any = await pool.query(
+        'CALL sp_registrar_salida_producto(?, ?, ?, ?, ?, ?, ?, ?)',
+        [
             codigo,
             cantidad,
             destino,
             id_asesor,
             id_cliente,
-            clienteNoRegistrado
-        ]);
-        return rows;
-    }
+            clienteNoRegistrado,
+            motivoSalida,
+            requestId
+        ]
+    );
+
+    return rows;
+}
     static async estadisticaMensual() {
         const query = `CALL  sp_estadisticas_mes_actual()`;
         const [rows]: any = await pool.query(query);

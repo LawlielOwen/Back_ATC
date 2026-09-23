@@ -133,41 +133,69 @@ export class DemoController {
         }
     }
     // Registrar entrada de stock (Suma de inventario a demos)
-    static async registrarEntrada(req: Request, res: Response) {
-        try {
-            const { codigo, cantidad, id_asesor } = req.body;
+   static async registrarEntrada(req: Request, res: Response) {
+    try {
+        const {
+            codigo,
+            cantidad,
+            id_asesor,
+            requestId
+        } = req.body;
 
-            if (!codigo || codigo.trim() === '') {
-                return res.status(400).json({ error: 'El código (número de serie o modelo) es obligatorio.' });
-            }
-
-            if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
-                return res.status(400).json({ error: 'La cantidad debe ser un número mayor a cero.' });
-            }
-
-            if (!id_asesor || isNaN(id_asesor)) {
-                return res.status(400).json({ error: 'El ID del asesor responsable es obligatorio.' });
-            }
-
-            const resultado = await DemoService.registrarEntrada(
-                codigo.trim(), 
-                Number(cantidad), 
-                Number(id_asesor)
-            );
-
-            const mensajeSP = (resultado[0] && resultado[0].mensaje) ? resultado[0].mensaje : '';
-            if (mensajeSP.startsWith('Error')) {
-                return res.status(400).json({ error: mensajeSP });
-            }
-
-            return res.status(200).json({ 
-                mensaje: 'Entrada registrada correctamente', 
-                resultado 
+        if (!codigo || codigo.trim() === '') {
+            return res.status(400).json({
+                error: 'El código (número de serie o modelo) es obligatorio.'
             });
-
-        } catch (error: any) {
-            console.error('Error al registrar entrada de demo:', error);
-            return res.status(500).json({ error: 'Error interno del servidor al registrar la entrada del demo.' });
         }
+
+        if (!cantidad || isNaN(Number(cantidad)) || Number(cantidad) <= 0) {
+            return res.status(400).json({
+                error: 'La cantidad debe ser un número mayor a cero.'
+            });
+        }
+
+        if (!id_asesor || isNaN(Number(id_asesor))) {
+            return res.status(400).json({
+                error: 'El ID del asesor responsable es obligatorio.'
+            });
+        }
+
+        if (!requestId || typeof requestId !== 'string' || requestId.trim().length !== 36) {
+            return res.status(400).json({
+                error: 'El identificador único de la operación no es válido.'
+            });
+        }
+
+        const resultado = await DemoService.registrarEntrada(
+            codigo.trim(),
+            Number(cantidad),
+            Number(id_asesor),
+            requestId.trim()
+        );
+
+        const mensajeSP =
+            resultado[0]?.mensaje || '';
+
+        if (mensajeSP.startsWith('Error')) {
+            return res.status(400).json({
+                error: mensajeSP
+            });
+        }
+
+        return res.status(200).json({
+            mensaje: mensajeSP || 'Entrada registrada correctamente',
+            resultado
+        });
+
+    } catch (error: any) {
+        console.error(
+            'Error al registrar entrada de demo:',
+            error
+        );
+
+        return res.status(500).json({
+            error: 'Error interno del servidor al registrar la entrada del demo.'
+        });
     }
+}
 }

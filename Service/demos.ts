@@ -69,14 +69,22 @@ export class DemoService {
         
         return rows[0]; 
     }
-    // Registrar nueva entrada de stock para un demo
-    static async registrarEntrada(codigo: string, cantidad: number, id_asesor: number) {
-        const [result]: any = await pool.query('CALL sp_registrar_entrada_demo(?, ?, ?)', [
+  static async registrarEntrada(
+    codigo: string,
+    cantidad: number,
+    id_asesor: number,
+    requestId: string
+) {
+    const [result]: any = await pool.query(
+        'CALL sp_registrar_entrada_demo(?, ?, ?, ?)',
+        [
             codigo,
             cantidad,
-            id_asesor
-        ]);
-        
-        return result[0];
-    }
+            id_asesor,
+            requestId
+        ]
+    );
+
+    return result[0];
+}
 }

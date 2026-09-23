@@ -13,41 +13,106 @@ export class MovimientoController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
-  static async registrarSalida(req: Request, res: Response) {
+ static async registrarSalida(req: Request, res: Response) {
     try {
-        const { codigo, cantidad, destino, id_asesor, id_cliente, clienteNoRegistrado } = req.body;
+        const {
+            codigo,
+            cantidad,
+            destino,
+            id_asesor,
+            id_cliente,
+            clienteNoRegistrado,
+            motivoSalida,
+            requestId
+        } = req.body;
 
         if (!codigo || !cantidad || cantidad <= 0 || !destino) {
-            return res.status(400).json({ error: 'Código, cantidad (mayor a 0) y destino son obligatorios' });
+            return res.status(400).json({
+                error: 'Código, cantidad (mayor a 0) y destino son obligatorios'
+            });
         }
 
-let destinoNormalizado = 'Almacen';
+        if (!requestId || typeof requestId !== 'string' || requestId.trim().length !== 36) {
+            return res.status(400).json({
+                error: 'El identificador único de la operación no es válido'
+            });
+        }
 
-if (destino.toLowerCase() === 'pedido') {
-    destinoNormalizado = 'Pedido';
-} else if (destino.toLowerCase() === 'entrega mostrador') {
-    destinoNormalizado = 'Entrega Mostrador'; 
-}
+        if (!id_asesor || isNaN(Number(id_asesor))) {
+            return res.status(400).json({
+                error: 'El responsable de la salida es obligatorio'
+            });
+        }
 
-        const idAsesorParseado = id_asesor ? parseInt(id_asesor) : null;
-        const idClienteParseado = id_cliente ? parseInt(id_cliente) : null;
-        
-        
-        const empresaNoRegistrada = clienteNoRegistrado || null;
+        let destinoNormalizado: string;
+
+        switch (destino.toLowerCase().trim()) {
+            case 'pedido':
+                destinoNormalizado = 'Pedido';
+                break;
+
+            case 'entrega mostrador':
+                destinoNormalizado = 'Entrega Mostrador';
+                break;
+
+            case 'salida administrativa':
+                destinoNormalizado = 'Salida Administrativa';
+                break;
+
+            case 'almacen':
+                destinoNormalizado = 'Almacen';
+                break;
+
+            default:
+                return res.status(400).json({
+                    error: 'El destino especificado no es válido'
+                });
+        }
+
+        if (
+            destinoNormalizado === 'Salida Administrativa' &&
+            (!motivoSalida || motivoSalida.trim() === '')
+        ) {
+            return res.status(400).json({
+                error: 'El motivo de la salida administrativa es obligatorio'
+            });
+        }
+
+        const idAsesorParseado = id_asesor
+            ? parseInt(id_asesor)
+            : null;
+
+        const idClienteParseado = id_cliente
+            ? parseInt(id_cliente)
+            : null;
+
+        const empresaNoRegistrada =
+            clienteNoRegistrado || null;
+
+        const motivoSalidaFinal =
+            destinoNormalizado === 'Salida Administrativa'
+                ? motivoSalida.trim()
+                : null;
 
         const result = await MovimientoService.registrarSalidaProducto(
-            codigo, 
-            parseInt(cantidad), 
-            destinoNormalizado, 
-            idAsesorParseado, 
-            idClienteParseado, 
-            empresaNoRegistrada
+            codigo,
+            parseInt(cantidad),
+            destinoNormalizado,
+            idAsesorParseado,
+            idClienteParseado,
+            empresaNoRegistrada,
+            motivoSalidaFinal,
+            requestId.trim()
         );
 
         res.status(200).json(result);
+
     } catch (error: any) {
         console.error(error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
     }
 }
     static async getMensuales(req: Request, res: Response) {

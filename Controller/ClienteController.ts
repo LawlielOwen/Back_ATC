@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
-import fs from 'fs'; // Asegúrate de importar fs
+import fs from 'fs';
 import path from 'path';
 const { leerPdfSatEstructurado } = require('./pdfHelper.js');
-// Importación limpia, ahora sí permitida por el tsconfig
 import pdfParse = require('pdf-parse');
 function extraerRegimenPorTextoPlano(textoLimpio: string): string {
     const regexBloque = /Reg[ií]menes?:\s*(?:R[eé]gimen\s*Fecha\s*Inicio\s*Fecha\s*Fin\s*)?([\s\S]*?)(?:Obligaciones:|$)/i;
@@ -151,42 +150,106 @@ export class ClienteController {
         }
     }
 
-    static async agregarCliente(req: any, res: Response) {
-        try {
-            const cliente = { ...req.body };
-            if (req.file) {
-                cliente.nombre_constancia = req.file.originalname;
-                cliente.ruta_constancia = `uploads/CSF/${req.file.filename}`;
-            } else {
-                cliente.nombre_constancia = '';
-                cliente.ruta_constancia = '';
-            }
+   static async agregarCliente(
+    req: any,
+    res: Response
+) {
+    try {
 
-            // El array de asesores viaja como string dentro del FormData, hay que parsearlo
-            let asesoresAsignados: any[] = [];
-            try {
-                asesoresAsignados = JSON.parse(req.body.asesores_json || '[]');
-            } catch {
-                asesoresAsignados = [];
-            }
+        const cliente = {
+            ...req.body
+        };
 
-            const result = await ClienteService.agregarCliente(cliente, asesoresAsignados);
-            return res.status(201).json(result);
 
-        } catch (error: any) {
-            console.error('Error al agregar cliente:', error);
-            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
-            if (error.message && error.message.includes('FORMATO_INVALIDO')) {
-                return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
-            }
-            if (error.message === 'File too large') {
-                return res.status(400).json({ error: 'La constancia es demasiado grande. El límite es 5MB.' });
-            }
-            return res.status(500).json({ error: 'Error interno del servidor al agregar cliente' });
+        if (req.file) {
+
+            cliente.nombre_constancia =
+                req.file.originalname;
+
+            cliente.ruta_constancia =
+                `uploads/CSF/${req.file.filename}`;
+
+        } else {
+
+            cliente.nombre_constancia = '';
+            cliente.ruta_constancia = '';
+
         }
+
+
+        let asesoresAsignados: any[] = [];
+
+        try {
+
+            asesoresAsignados = JSON.parse(
+                req.body.asesores_json || '[]'
+            );
+
+        } catch {
+
+            asesoresAsignados = [];
+
+        }
+
+
+        const result =
+            await ClienteService.agregarCliente(
+                cliente,
+                asesoresAsignados
+            );
+
+
+        return res.status(201).json(result);
+
+    } catch (error: any) {
+
+        console.error(
+            'Error al agregar cliente:',
+            error
+        );
+
+
+        if (
+            req.file &&
+            req.file.path &&
+            fs.existsSync(req.file.path)
+        ) {
+            fs.unlinkSync(req.file.path);
+        }
+
+
+        if (
+            error.message &&
+            error.message.includes('FORMATO_INVALIDO')
+        ) {
+            return res.status(400).json({
+                error:
+                    'Solo se permite subir archivos PDF para la constancia.'
+            });
+        }
+
+
+        if (error.message === 'File too large') {
+
+            return res.status(400).json({
+                error:
+                    'La constancia es demasiado grande. El límite es 5MB.'
+            });
+
+        }
+        const mensajeBD =
+            error.sqlMessage ||
+            error.message;
+
+
+        return res.status(400).json({
+            error:
+                mensajeBD ||
+                'Error al agregar cliente'
+        });
+
     }
+}
 
     static async actualizarCliente(req: any, res: Response) {
         try {
@@ -239,20 +302,20 @@ export class ClienteController {
     }
 
     static async buscaryfiltrarClientes(req: Request, res: Response) {
-    try {
-        const busqueda = req.query.busqueda as string || null;
-        const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : null;
-        const pagina = parseInt(req.query.pagina as string) || 1;
-        const limite = parseInt(req.query.limite as string) || 9;
-        const idAsesor = req.query.idAsesor ? parseInt(req.query.idAsesor as string) : null; // Se captura el ID
+        try {
+            const busqueda = req.query.busqueda as string || null;
+            const estatus = req.query.estatus ? parseInt(req.query.estatus as string) : null;
+            const pagina = parseInt(req.query.pagina as string) || 1;
+            const limite = parseInt(req.query.limite as string) || 9;
+            const idAsesor = req.query.idAsesor ? parseInt(req.query.idAsesor as string) : null; // Se captura el ID
 
-        const result = await ClienteService.buscaryfiltrarClientes(busqueda, estatus, pagina, limite, idAsesor);
-        res.status(200).json(result);
-    } catch (error: any) {
-        console.error(error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+            const result = await ClienteService.buscaryfiltrarClientes(busqueda, estatus, pagina, limite, idAsesor);
+            res.status(200).json(result);
+        } catch (error: any) {
+            console.error(error);
+            res.status(500).json({ error: 'Error interno del servidor' });
+        }
     }
-}
 
     static async procesarCSF(req: any, res: Response) {
         try {
@@ -390,9 +453,9 @@ export class ClienteController {
                 nombre_constancia: req.file.originalname
             });
 
-               } catch (error: any) {
+        } catch (error: any) {
             console.error("Error al procesar el PDF:", error);
-           
+
             const esProblemaDeTexto = error?.message && (
                 /no text|empty|scan/i.test(error.message)
             );
@@ -466,50 +529,163 @@ export class ClienteController {
             return res.status(500).json({ error: 'Error interno del servidor al procesar la CSF.' });
         }
     }
- static async asignarCredito(req: Request, res: Response) {
+    static async asignarCredito(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { tiene_credito, limite_credito, fecha_vencimiento } = req.body;
+
+            if (tiene_credito === undefined || tiene_credito === null) {
+                return res.status(400).json({ error: 'El campo tiene_credito es obligatorio.' });
+            }
+
+            const limite = limite_credito !== undefined && limite_credito !== null
+                ? Number(limite_credito)
+                : 0;
+
+            if (isNaN(limite)) {
+                return res.status(400).json({ error: 'El límite de crédito debe ser un número válido.' });
+            }
+
+            const tieneCreditoBool = Boolean(tiene_credito);
+
+            // NUEVO: si se autoriza crédito, la fecha es obligatoria desde este nivel también
+            // (el SP la vuelve a validar, pero así el error llega más rápido y más claro)
+            if (tieneCreditoBool && (!fecha_vencimiento || typeof fecha_vencimiento !== 'string')) {
+                return res.status(400).json({ error: 'Debe capturar una fecha de vencimiento para autorizar la línea de crédito.' });
+            }
+
+            const fechaVencimientoFinal = tieneCreditoBool ? fecha_vencimiento : null;
+
+            const mensaje = await ClienteService.asignarCredito(
+                Number(id),
+                tieneCreditoBool,
+                limite,
+                fechaVencimientoFinal
+            );
+
+            if (mensaje.toLowerCase().startsWith('error')) {
+                return res.status(400).json({ error: mensaje });
+            }
+
+            return res.status(200).json({ mensaje });
+
+        } catch (error) {
+            console.error('Error al asignar crédito:', error);
+            return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
+        }
+    }
+    static async obtenerMovimientosCredito(
+        req: any,
+        res: Response
+    ) {
+        try {
+
+            const idCliente = parseInt(
+                req.params.id as string
+            );
+
+
+            if (
+                Number.isNaN(idCliente) ||
+                idCliente <= 0
+            ) {
+                return res.status(400).json({
+                    error: 'ID de cliente inválido'
+                });
+            }
+
+
+            const movimientos =
+                await ClienteService.obtenerMovimientosCredito(
+                    idCliente
+                );
+
+
+            return res.status(200).json({
+                movimientos
+            });
+
+        } catch (error: any) {
+
+            console.error(
+                'Error al obtener movimientos de crédito:',
+                error
+            );
+
+
+            return res.status(500).json({
+                error:
+                    'Error interno al obtener el historial de crédito'
+            });
+
+        }
+    }
+    static async registrarPagoCredito(
+    req: any,
+    res: Response
+) {
     try {
-        const { id } = req.params;
-        const { tiene_credito, limite_credito, fecha_vencimiento } = req.body;
 
-        if (tiene_credito === undefined || tiene_credito === null) {
-            return res.status(400).json({ error: 'El campo tiene_credito es obligatorio.' });
-        }
-
-        const limite = limite_credito !== undefined && limite_credito !== null
-            ? Number(limite_credito)
-            : 0;
-
-        if (isNaN(limite)) {
-            return res.status(400).json({ error: 'El límite de crédito debe ser un número válido.' });
-        }
-
-        const tieneCreditoBool = Boolean(tiene_credito);
-
-        // NUEVO: si se autoriza crédito, la fecha es obligatoria desde este nivel también
-        // (el SP la vuelve a validar, pero así el error llega más rápido y más claro)
-        if (tieneCreditoBool && (!fecha_vencimiento || typeof fecha_vencimiento !== 'string')) {
-            return res.status(400).json({ error: 'Debe capturar una fecha de vencimiento para autorizar la línea de crédito.' });
-        }
-
-        const fechaVencimientoFinal = tieneCreditoBool ? fecha_vencimiento : null;
-
-        const mensaje = await ClienteService.asignarCredito(
-            Number(id),
-            tieneCreditoBool,
-            limite,
-            fechaVencimientoFinal
+        const idCliente = parseInt(
+            req.params.id as string
         );
 
-        if (mensaje.toLowerCase().startsWith('error')) {
-            return res.status(400).json({ error: mensaje });
+        const {
+            monto,
+            referencia,
+            observaciones
+        } = req.body;
+
+
+        if (
+            Number.isNaN(idCliente) ||
+            idCliente <= 0
+        ) {
+            return res.status(400).json({
+                error: 'ID de cliente inválido'
+            });
         }
 
-        return res.status(200).json({ mensaje });
 
-    } catch (error) {
-        console.error('Error al asignar crédito:', error);
-        return res.status(500).json({ error: 'No se pudo procesar la asignación de crédito.' });
+        const montoPago = Number(monto);
+
+        if (
+            Number.isNaN(montoPago) ||
+            montoPago <= 0
+        ) {
+            return res.status(400).json({
+                error: 'El monto debe ser mayor a $0'
+            });
+        }
+
+
+        const mensaje =
+            await ClienteService.registrarPagoCredito(
+                idCliente,
+                montoPago,
+                referencia || null,
+                observaciones || null
+            );
+
+
+        return res.status(200).json({
+            mensaje
+        });
+
+    } catch (error: any) {
+
+        console.error(
+            'Error al registrar pago de crédito:',
+            error
+        );
+
+
+        return res.status(400).json({
+            error:
+                error.message ||
+                'No se pudo registrar el pago'
+        });
+
     }
 }
-
 }

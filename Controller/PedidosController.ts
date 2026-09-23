@@ -185,37 +185,59 @@ static async crearPedidoDirecto(req: Request, res: Response) {
             moneda,
             tipo_cambio,
             vigencia_dias,
-            detalles
+            detalles,
+            requestId
         } = req.body;
 
         if (!id_cliente) {
-            return res.status(400).json({ error: 'Debes indicar el cliente del pedido.' });
+            return res.status(400).json({
+                error: 'Debes indicar el cliente del pedido.'
+            });
         }
+
         if (!id_asesor) {
-            return res.status(400).json({ error: 'Debes indicar el asesor del pedido.' });
+            return res.status(400).json({
+                error: 'Debes indicar el asesor del pedido.'
+            });
         }
+
         if (!Array.isArray(detalles) || detalles.length === 0) {
-            return res.status(400).json({ error: 'El pedido debe tener al menos un producto.' });
+            return res.status(400).json({
+                error: 'El pedido debe tener al menos un producto.'
+            });
+        }
+
+        if (!requestId || typeof requestId !== 'string' || requestId.trim().length !== 36) {
+            return res.status(400).json({
+                error: 'El identificador único de la operación no es válido.'
+            });
         }
 
         const result = await PedidoService.crearPedidoDirecto(
-            id_cliente,
-            id_asesor,
+            Number(id_cliente),
+            Number(id_asesor),
             orden_compra || null,
             moneda || 'MONEDA NACIONAL',
-            tipo_cambio || 1,
-            vigencia_dias || 15,
-            detalles
+            Number(tipo_cambio) || 1,
+            Number(vigencia_dias) || 15,
+            detalles,
+            requestId.trim()
         );
 
         if (result.id_pedido === -1) {
-            return res.status(400).json({ error: result.mensaje });
+            return res.status(400).json({
+                error: result.mensaje
+            });
         }
 
         return res.status(201).json(result);
+
     } catch (error: any) {
         console.error('Error en crearPedidoDirecto:', error);
-        return res.status(500).json({ error: 'Error interno del servidor al crear el pedido.' });
+
+        return res.status(500).json({
+            error: 'Error interno del servidor al crear el pedido.'
+        });
     }
 }
 static async reembolsarPedido(req: Request, res: Response) {
