@@ -45,38 +45,114 @@ export class ClienteService {
         return rows;
     }
     static async obtenerClientePorId(id: number) {
-        const [rows]: any = await pool.query('SELECT * FROM verClientes WHERE id = ?', [id]);
-        const cliente = rows[0];
-        if (!cliente) return null;
+    const [rows]: any = await pool.query(
+        'SELECT * FROM verClientes WHERE id = ?',
+        [id]
+    );
 
-        // FIX: se agrega el JOIN a asesores para traer el nombre junto con sus marcas asignadas
-        const [relaciones]: any = await pool.query(
-            `SELECT 
-            ca.id_asesor, 
-            ca.asesor_tipo, 
+    const cliente = rows[0];
+
+    if (!cliente) {
+        return null;
+    }
+
+    const [relaciones]: any = await pool.query(
+        `
+        SELECT
+            ca.id_asesor,
+            ca.asesor_tipo,
             ca.marcas_asignadas,
-            TRIM(CONCAT_WS(' ', a.Nombre, a.app, a.apm)) AS nombre_asesor
-         FROM cliente_asesor ca
-         LEFT JOIN asesores a ON ca.id_asesor = a.id
-         WHERE ca.id_cliente = ?`,
-            [id]
-        );
+            TRIM(
+                CONCAT_WS(
+                    ' ',
+                    a.Nombre,
+                    a.app,
+                    a.apm
+                )
+            ) AS nombre_asesor
+        FROM cliente_asesor ca
+        LEFT JOIN asesores a
+            ON ca.id_asesor = a.id
+        WHERE ca.id_cliente = ?
+        `,
+        [id]
+    );
 
-        cliente.asesoresAsignados = relaciones.length > 0
+    const [contactos]: any = await pool.query(
+        `
+        SELECT
+            id,
+            id_cliente,
+            nombre_contacto AS nombre,
+            telefono,
+            correo,
+            puesto,
+            es_principal,
+            estatus,
+            fecha_registro
+        FROM cliente_contactos
+        WHERE id_cliente = ?
+          AND estatus = 1
+        ORDER BY es_principal DESC, id ASC
+        `,
+        [id]
+    );
+
+    const [constancias]: any = await pool.query(
+        `
+        SELECT
+            id,
+            id_cliente,
+            nombre_constancia AS nombre,
+            ruta_constancia AS ruta,
+            fecha_constancia AS fecha,
+            es_principal,
+            estatus
+        FROM cliente_constancias
+        WHERE id_cliente = ?
+          AND estatus = 1
+        ORDER BY es_principal DESC, fecha_constancia DESC, id DESC
+        `,
+        [id]
+    );
+
+    cliente.asesoresAsignados =
+        relaciones.length > 0
             ? relaciones.map((r: any) => ({
                 id_asesor: r.id_asesor.toString(),
-                nombre_asesor: r.nombre_asesor || 'Asesor sin nombre',
-                asesor_tipo: r.asesor_tipo,
-                marcasArray: (r.marcas_asignadas || '')
-                    .split(',')
-                    .map((m: string) => m.trim())
-                    .filter((m: string) => m.length > 0),
-                marcas_asignadas: r.marcas_asignadas || ''
+                nombre_asesor:
+                    r.nombre_asesor || 'Asesor sin nombre',
+                asesor_tipo:
+                    r.asesor_tipo,
+                marcasArray:
+                    (r.marcas_asignadas || '')
+                        .split(',')
+                        .map((m: string) => m.trim())
+                        .filter((m: string) => m.length > 0),
+                marcas_asignadas:
+                    r.marcas_asignadas || ''
             }))
-            : [{ id_asesor: '', nombre_asesor: '', asesor_tipo: '', marcasArray: [], marcas_asignadas: '' }];
+            : [
+                {
+                    id_asesor: '',
+                    nombre_asesor: '',
+                    asesor_tipo: '',
+                    marcasArray: [],
+                    marcas_asignadas: ''
+                }
+            ];
 
-        return cliente;
-    }
+    cliente.contactos = contactos;
+    cliente.constancias = constancias;
+
+    cliente.total_contactos =
+        contactos.length;
+
+    cliente.total_constancias =
+        constancias.length;
+
+    return cliente;
+}
     static async buscaryfiltrarClientes(busqueda: string | null, estatus: number | null, pagina: number = 1, limite: number = 6, idAsesor: number | null = null) {
         const offset = (pagina - 1) * limite;
 
@@ -106,120 +182,12 @@ export class ClienteService {
         const [rows]: any = await pool.query('SELECT COUNT(*) AS total_activos FROM verClientes WHERE Estatus = 1;');
         return rows[0];
     }
-    static async agregarCliente(
-        cliente: any,
-        asesoresAsignados: any[] = []
-    ) {
-        const {
-            Nombre,
-            RFC,
-            Razon_social,
-            Regimen_fiscal,
-            Direccion,
-            contacto_principal,
-            nombre_contacto,
-            correo_contacto,
-            CP,
-            nombre_constancia,
-            ruta_constancia,
-            tiene_credito,
-            limite_credito,
-            fecha_vencimiento_credito
-        } = cliente;
-
-        // FormData normalmente manda "0" y "1" como string.
-        const tieneCredito =
-            Number(tiene_credito) === 1 ? 1 : 0;
-
-        const limiteCredito =
-            tieneCredito === 1
-                ? Number(limite_credito || 0)
-                : 0;
-
-        const fechaVencimiento =
-            tieneCredito === 1 && fecha_vencimiento_credito
-                ? fecha_vencimiento_credito
-                : null;
-
-        const [resultSets]: any = await pool.query(
-            `CALL sp_agregar_cliente(
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?
-        )`,
-            [
-                Nombre,
-                RFC,
-                Razon_social,
-                Regimen_fiscal,
-                Direccion,
-
-                contacto_principal,
-                nombre_contacto || null,
-                correo_contacto,
-                CP,
-
-                nombre_constancia || '',
-                ruta_constancia || '',
-
-                tieneCredito,
-                limiteCredito,
-                fechaVencimiento,
-
-                null,
-                null,
-                null
-            ]
-        );
-
-        const nuevoId = resultSets[0][0].id;
-
-        /*
-            El SP recibe asesor NULL porque tú actualmente
-            manejas varios asesores desde Node.
-        */
-
-        for (const rel of asesoresAsignados) {
-
-            if (!rel.id_asesor) {
-                continue;
-            }
-
-            const marcas =
-                Array.isArray(rel.marcasArray)
-                    ? rel.marcasArray.join(', ')
-                    : rel.marcas_asignadas || '';
-
-            await pool.query(
-                `
-            INSERT INTO cliente_asesor (
-                id_cliente,
-                id_asesor,
-                asesor_tipo,
-                marcas_asignadas
-            )
-            VALUES (?, ?, ?, ?)
-            `,
-                [
-                    nuevoId,
-                    parseInt(rel.id_asesor),
-                    rel.asesor_tipo,
-                    marcas
-                ]
-            );
-        }
-
-        return {
-            id: nuevoId,
-            mensaje: 'Cliente agregado correctamente'
-        };
-    }
-
-  static async actualizarCliente(
-    id: number,
+   static async agregarCliente(
     cliente: any,
     asesoresAsignados: any[] = []
 ) {
     const {
+        codigo_cliente,
         Nombre,
         RFC,
         Razon_social,
@@ -249,41 +217,255 @@ export class ClienteService {
             ? fecha_vencimiento_credito
             : null;
 
-    await pool.query(
-        `CALL sp_modificar_cliente(
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?
-        )`,
-        [
-            id,
+    let contactos: any[] | null = null;
+    let constancias: any[] | null = null;
 
-            Nombre,
-            RFC,
-            Razon_social,
-            Regimen_fiscal,
-            Direccion,
+    if (Array.isArray(cliente.contactos)) {
+        contactos = cliente.contactos;
+    } else if (typeof cliente.contactos === 'string' && cliente.contactos.trim() !== '') {
+        try {
+            contactos = JSON.parse(cliente.contactos);
+        } catch {
+            contactos = [];
+        }
+    }
 
-            contacto_principal,
-            nombre_contacto || null,
-            correo_contacto,
-            CP,
+    if (Array.isArray(cliente.constancias)) {
+        constancias = cliente.constancias;
+    } else if (typeof cliente.constancias === 'string' && cliente.constancias.trim() !== '') {
+        try {
+            constancias = JSON.parse(cliente.constancias);
+        } catch {
+            constancias = [];
+        }
+    }
 
-            nombre_constancia || '',
-            ruta_constancia || '',
+    const contactosExtra =
+        contactos === null
+            ? null
+            : contactos
+                .filter((c: any) => Number(c.es_principal) !== 1)
+                .map((c: any) => ({
+                    nombre: c.nombre || c.nombre_contacto || null,
+                    telefono: c.telefono || null,
+                    correo: c.correo || null,
+                    puesto: c.puesto || null
+                }));
 
-            tieneCredito,
-            limiteCredito,
-            fechaVencimiento,
+    const constanciasExtra =
+        constancias === null
+            ? null
+            : constancias
+                .filter((c: any) => Number(c.es_principal) !== 1)
+                .map((c: any) => ({
+                    nombre: c.nombre || c.nombre_constancia || null,
+                    ruta: c.ruta || c.ruta_constancia || null,
+                    fecha: c.fecha || c.fecha_constancia || null
+                }));
 
-            null,
-            null,
-            null
-        ]
+    const parametros = [
+        codigo_cliente?.trim() || null,
+        Nombre,
+        RFC,
+        Razon_social,
+        Regimen_fiscal,
+        Direccion,
+
+        contacto_principal || null,
+        nombre_contacto || null,
+        correo_contacto || null,
+        CP,
+
+        nombre_constancia || '',
+        ruta_constancia || '',
+
+        tieneCredito,
+        limiteCredito,
+        fechaVencimiento,
+
+        null,
+        null,
+        null,
+
+        contactosExtra === null
+            ? null
+            : JSON.stringify(contactosExtra),
+
+        constanciasExtra === null
+            ? null
+            : JSON.stringify(constanciasExtra)
+    ];
+
+    const placeholders =
+        parametros.map(() => '?').join(', ');
+
+    const [resultSets]: any = await pool.query(
+        `CALL sp_agregar_cliente(${placeholders})`,
+        parametros
     );
 
-    /*
-        Se reemplazan las relaciones con asesores.
-    */
+    const nuevoId = resultSets[0][0].id;
+
+    for (const rel of asesoresAsignados) {
+        if (!rel.id_asesor) {
+            continue;
+        }
+
+        const marcas =
+            Array.isArray(rel.marcasArray)
+                ? rel.marcasArray.join(', ')
+                : rel.marcas_asignadas || '';
+
+        await pool.query(
+            `
+            INSERT INTO cliente_asesor (
+                id_cliente,
+                id_asesor,
+                asesor_tipo,
+                marcas_asignadas
+            )
+            VALUES (?, ?, ?, ?)
+            `,
+            [
+                nuevoId,
+                parseInt(rel.id_asesor),
+                rel.asesor_tipo,
+                marcas
+            ]
+        );
+    }
+
+    return {
+        id: nuevoId,
+        mensaje: 'Cliente agregado correctamente'
+    };
+}
+
+static async actualizarCliente(
+    id: number,
+    cliente: any,
+    asesoresAsignados: any[] = []
+) {
+    const {
+        codigo_cliente,
+        Nombre,
+        RFC,
+        Razon_social,
+        Regimen_fiscal,
+        Direccion,
+        contacto_principal,
+        nombre_contacto,
+        correo_contacto,
+        CP,
+        nombre_constancia,
+        ruta_constancia,
+        tiene_credito,
+        limite_credito,
+        fecha_vencimiento_credito
+    } = cliente;
+
+    const tieneCredito =
+        Number(tiene_credito) === 1 ? 1 : 0;
+
+    const limiteCredito =
+        tieneCredito === 1
+            ? Number(limite_credito || 0)
+            : 0;
+
+    const fechaVencimiento =
+        tieneCredito === 1 && fecha_vencimiento_credito
+            ? fecha_vencimiento_credito
+            : null;
+
+    let contactos: any[] | null = null;
+    let constancias: any[] | null = null;
+
+    if (Array.isArray(cliente.contactos)) {
+        contactos = cliente.contactos;
+    } else if (typeof cliente.contactos === 'string' && cliente.contactos.trim() !== '') {
+        try {
+            contactos = JSON.parse(cliente.contactos);
+        } catch {
+            contactos = [];
+        }
+    }
+
+    if (Array.isArray(cliente.constancias)) {
+        constancias = cliente.constancias;
+    } else if (typeof cliente.constancias === 'string' && cliente.constancias.trim() !== '') {
+        try {
+            constancias = JSON.parse(cliente.constancias);
+        } catch {
+            constancias = [];
+        }
+    }
+
+    const contactosExtra =
+        contactos === null
+            ? null
+            : contactos
+                .filter((c: any) => Number(c.es_principal) !== 1)
+                .map((c: any) => ({
+                    nombre: c.nombre || c.nombre_contacto || null,
+                    telefono: c.telefono || null,
+                    correo: c.correo || null,
+                    puesto: c.puesto || null
+                }));
+
+    const constanciasExtra =
+        constancias === null
+            ? null
+            : constancias
+                .filter((c: any) => Number(c.es_principal) !== 1)
+                .map((c: any) => ({
+                    nombre: c.nombre || c.nombre_constancia || null,
+                    ruta: c.ruta || c.ruta_constancia || null,
+                    fecha: c.fecha || c.fecha_constancia || null
+                }));
+
+    const parametros = [
+        id,
+
+        codigo_cliente?.trim() || null,
+
+        Nombre,
+        RFC,
+        Razon_social,
+        Regimen_fiscal,
+        Direccion,
+
+        contacto_principal || null,
+        nombre_contacto || null,
+        correo_contacto || null,
+        CP,
+
+        nombre_constancia || '',
+        ruta_constancia || '',
+
+        tieneCredito,
+        limiteCredito,
+        fechaVencimiento,
+
+        null,
+        null,
+        null,
+
+        contactosExtra === null
+            ? null
+            : JSON.stringify(contactosExtra),
+
+        constanciasExtra === null
+            ? null
+            : JSON.stringify(constanciasExtra)
+    ];
+
+    const placeholders =
+        parametros.map(() => '?').join(', ');
+
+    await pool.query(
+        `CALL sp_modificar_cliente(${placeholders})`,
+        parametros
+    );
 
     await pool.query(
         'DELETE FROM cliente_asesor WHERE id_cliente = ?',
@@ -291,7 +473,6 @@ export class ClienteService {
     );
 
     for (const rel of asesoresAsignados) {
-
         if (!rel.id_asesor) {
             continue;
         }
@@ -324,29 +505,49 @@ export class ClienteService {
         mensaje: 'Cliente actualizado correctamente'
     };
 }
-    static async subirCSF(id_cliente: number, nombre_constancia: string, ruta_constancia: string) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.query('CALL sp_subir_csf_cliente(?, ?, ?, @p_mensaje, @p_ruta_anterior)', [
+   static async subirCSF(
+    id_cliente: number,
+    nombre_constancia: string,
+    ruta_constancia: string
+) {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            `CALL sp_subir_csf_cliente(
+                ?, ?, ?,
+                @p_mensaje,
+                @p_ruta_anterior
+            )`,
+            [
                 id_cliente,
                 nombre_constancia,
                 ruta_constancia
-            ]);
+            ]
+        );
 
-            const [results]: any = await connection.query('SELECT @p_mensaje AS mensaje, @p_ruta_anterior AS ruta_anterior');
+        const [results]: any = await connection.query(
+            `SELECT
+                @p_mensaje AS mensaje,
+                @p_ruta_anterior AS ruta_anterior`
+        );
 
-            const mensaje = results[0].mensaje;
-            const ruta_anterior = results[0].ruta_anterior;
+        const mensaje = results[0]?.mensaje;
+        const ruta_anterior = results[0]?.ruta_anterior;
 
-            if (mensaje && mensaje.startsWith('Error:')) {
-                throw new Error(mensaje);
-            }
-
-            return { mensaje, ruta_anterior };
-        } finally {
-            connection.release();
+        if (mensaje && mensaje.startsWith('Error:')) {
+            throw new Error(mensaje);
         }
+
+        return {
+            mensaje,
+            ruta_anterior
+        };
+
+    } finally {
+        connection.release();
     }
+}
    static async asignarCredito(
     id_cliente: number,
     tiene_credito: boolean,
@@ -467,5 +668,57 @@ static async obtenerMovimientosCredito(
     );
 
     return rows;
+}
+static async actualizarCodigoCliente(
+    idCliente: number,
+    codigoCliente: string
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_actualizar_codigo_cliente(?, ?, @p_mensaje)',
+            [
+                idCliente,
+                codigoCliente
+            ]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
+}
+static async actualizarVigenciaCredito(
+    idCliente: number,
+    fechaVencimiento: string
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_actualizar_vigencia_credito_cliente(?, ?, @p_mensaje)',
+            [
+                idCliente,
+                fechaVencimiento
+            ]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
 }
 }

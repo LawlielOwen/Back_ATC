@@ -482,53 +482,67 @@ export class ClienteController {
         }
     }
     static async subirCSF(req: any, res: Response) {
-        try {
-            const id_cliente = parseInt(req.params.id as string);
+    try {
+        const id_cliente = parseInt(req.params.id as string);
 
-            if (!req.file) {
-                return res.status(400).json({ error: 'No se ha detectado ningún archivo CSF para subir.' });
-            }
-
-            if (isNaN(id_cliente)) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({ error: 'El ID del cliente no es válido.' });
-            }
-
-            const nombre_constancia = req.file.originalname;
-            const ruta_constancia = `uploads/CSF/${req.file.filename}`;
-            const { mensaje, ruta_anterior } = await ClienteService.subirCSF(id_cliente, nombre_constancia, ruta_constancia);
-
-            if (ruta_anterior && ruta_anterior !== '') {
-                const rutaAbsolutaAnterior = path.join(process.cwd(), ruta_anterior);
-
-                if (fs.existsSync(rutaAbsolutaAnterior)) {
-                    fs.unlinkSync(rutaAbsolutaAnterior);
-                }
-            }
-
-            return res.status(200).json({ mensaje, ruta: ruta_constancia });
-
-        } catch (error: any) {
-            console.error('Error en subirCSF:', error);
-
-            if (req.file && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
-
-            if (error.message && error.message.includes('FORMATO_INVALIDO')) {
-                return res.status(400).json({ error: 'Solo se permite subir archivos PDF para la constancia.' });
-            }
-            if (error.message === 'File too large') {
-                return res.status(400).json({ error: 'El archivo es demasiado grande. El máximo es 5MB.' });
-            }
-
-            if (error.message && error.message.startsWith('Error:')) {
-                return res.status(400).json({ error: error.message.replace('Error: ', '') });
-            }
-
-            return res.status(500).json({ error: 'Error interno del servidor al procesar la CSF.' });
+        if (!req.file) {
+            return res.status(400).json({
+                error: 'No se ha detectado ningún archivo CSF para subir.'
+            });
         }
+
+        if (isNaN(id_cliente)) {
+            fs.unlinkSync(req.file.path);
+
+            return res.status(400).json({
+                error: 'El ID del cliente no es válido.'
+            });
+        }
+
+        const nombre_constancia = req.file.originalname;
+        const ruta_constancia = `uploads/CSF/${req.file.filename}`;
+
+        const { mensaje } = await ClienteService.subirCSF(
+            id_cliente,
+            nombre_constancia,
+            ruta_constancia
+        );
+
+        return res.status(200).json({
+            mensaje,
+            ruta: ruta_constancia
+        });
+
+    } catch (error: any) {
+        console.error('Error en subirCSF:', error);
+
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        if (error.message && error.message.includes('FORMATO_INVALIDO')) {
+            return res.status(400).json({
+                error: 'Solo se permite subir archivos PDF para la constancia.'
+            });
+        }
+
+        if (error.message === 'File too large') {
+            return res.status(400).json({
+                error: 'El archivo es demasiado grande. El máximo es 5MB.'
+            });
+        }
+
+        if (error.message && error.message.startsWith('Error:')) {
+            return res.status(400).json({
+                error: error.message.replace('Error: ', '')
+            });
+        }
+
+        return res.status(500).json({
+            error: 'Error interno del servidor al procesar la CSF.'
+        });
     }
+}
     static async asignarCredito(req: Request, res: Response) {
         try {
             const { id } = req.params;
@@ -686,6 +700,121 @@ export class ClienteController {
                 'No se pudo registrar el pago'
         });
 
+    }
+}
+static async actualizarCodigoCliente(req: Request, res: Response) {
+    try {
+        const idCliente = Number(req.params.id);
+        const { codigo_cliente } = req.body;
+
+        if (!Number.isInteger(idCliente) || idCliente <= 0) {
+            return res.status(400).json({
+                error: 'El ID del cliente no es válido.'
+            });
+        }
+
+        if (
+            !codigo_cliente ||
+            typeof codigo_cliente !== 'string' ||
+            codigo_cliente.trim() === ''
+        ) {
+            return res.status(400).json({
+                error: 'Debe ingresar el código del cliente.'
+            });
+        }
+
+        if (codigo_cliente.trim().length > 50) {
+            return res.status(400).json({
+                error: 'El código del cliente no puede superar los 50 caracteres.'
+            });
+        }
+
+        const mensaje =
+            await ClienteService.actualizarCodigoCliente(
+                idCliente,
+                codigo_cliente.trim()
+            );
+
+        if (mensaje && mensaje.startsWith('Error:')) {
+            return res.status(400).json({
+                error: mensaje.replace('Error: ', '')
+            });
+        }
+
+        return res.status(200).json({
+            mensaje,
+            codigo_cliente: codigo_cliente.trim()
+        });
+
+    } catch (error: any) {
+        console.error(
+            'Error al actualizar código del cliente:',
+            error
+        );
+
+        return res.status(500).json({
+            error: 'Error interno del servidor al actualizar el código del cliente.'
+        });
+    }
+}
+static async actualizarVigenciaCredito(req: Request, res: Response) {
+    try {
+        const idCliente = Number(req.params.id);
+
+        const {
+            fecha_vencimiento_credito
+        } = req.body;
+
+        if (!Number.isInteger(idCliente) || idCliente <= 0) {
+            return res.status(400).json({
+                error: 'El ID del cliente no es válido.'
+            });
+        }
+
+        if (
+            !fecha_vencimiento_credito ||
+            typeof fecha_vencimiento_credito !== 'string'
+        ) {
+            return res.status(400).json({
+                error: 'Debe ingresar la nueva fecha de vencimiento.'
+            });
+        }
+
+        const fechaRegex =
+            /^\d{4}-\d{2}-\d{2}$/;
+
+        if (!fechaRegex.test(fecha_vencimiento_credito)) {
+            return res.status(400).json({
+                error: 'La fecha debe tener el formato YYYY-MM-DD.'
+            });
+        }
+
+        const mensaje =
+            await ClienteService.actualizarVigenciaCredito(
+                idCliente,
+                fecha_vencimiento_credito
+            );
+
+        if (mensaje && mensaje.startsWith('Error:')) {
+            return res.status(400).json({
+                error: mensaje.replace('Error: ', '')
+            });
+        }
+
+        return res.status(200).json({
+            mensaje,
+            fecha_vencimiento_credito
+        });
+
+    } catch (error: any) {
+        console.error(
+            'Error al actualizar vigencia del crédito:',
+            error
+        );
+
+        return res.status(500).json({
+            error: 'Error interno del servidor al actualizar la vigencia del crédito.'
+        });
     }
 }
 }

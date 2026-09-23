@@ -52,4 +52,7 @@ router.post('/clientes/:id/CSF', uploadRecibo.single('CSF'), validarPDFReal, Cli
 router.put('/clientes/:id/credito', ClienteController.asignarCredito);
 router.post('/clientes/:id/credito/pago',ClienteController.registrarPagoCredito);
 router.get('/clientes/:id/credito/movimientos',ClienteController.obtenerMovimientosCredito);
+router.put('/clientes/:id/codigo',ClienteController.actualizarCodigoCliente);
+
+router.put('/clientes/:id/credito/vigencia',ClienteController.actualizarVigenciaCredito);
 export default router;
