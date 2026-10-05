@@ -3,55 +3,107 @@ import { Productos } from '../Model/Productos'
 
 export class ProductoService {
 static async agregarProducto(p: Productos) {
-    const { 
-        Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
-        Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
+    const {
+        Nombre,
+        Descripcion,
+        ExtraDescripcion,
+        Precio,
+        Codigo_numeral,
+        Codigo_japon,
+        id_estanteria,
+        id_caja,
+        Stock,
+        Apartado,
+        id_marca
     } = p;
 
     try {
-        const [rows]: any = await pool.query('CALL sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?)', [
-            Nombre, 
-            Descripcion, 
-            ExtraDescripcion || null, 
-            Precio, 
-            Codigo_numeral, 
-            Codigo_japon, 
-            Estanteria, 
-            Caja, 
-            Stock || 0, 
-            Apartado || 0, 
-            id_marca 
-        ]);
+        const [rows]: any = await pool.query(
+            'CALL sp_agregar_producto(?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                Nombre,
+                Descripcion,
+                ExtraDescripcion || null,
+                Precio,
+                Codigo_numeral,
+                Codigo_japon,
+                id_estanteria,
+                id_caja,
+                Stock || 0,
+                Apartado || 0,
+                id_marca
+            ]
+        );
+
         return rows;
+
     } catch (error: any) {
-        if (error.sqlMessage && error.sqlMessage.includes('Error:')) {
+
+        if (
+            error.sqlMessage &&
+            error.sqlMessage.includes('Error:')
+        ) {
             throw new Error(error.sqlMessage);
         }
-        throw new Error('Error al registrar el producto en la base de datos.');
+
+        throw new Error(
+            'Error al registrar el producto en la base de datos.'
+        );
     }
 }
-    static async modificarProducto(id: Number, p: Productos) {
-        const { 
-            Nombre, Descripcion, ExtraDescripcion, Precio, Codigo_numeral, 
-            Codigo_japon, Estanteria, Caja, Stock, Apartado, id_marca 
-        } = p;
+   static async modificarProducto(
+    id: number,
+    p: Productos
+) {
+    const {
+        Nombre,
+        Descripcion,
+        ExtraDescripcion,
+        Precio,
+        Codigo_numeral,
+        Codigo_japon,
+        id_estanteria,
+        id_caja,
+        Stock,
+        Apartado,
+        id_marca
+    } = p;
 
-        const [rows]: any = await pool.query('call sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?,?)', [
-            id, 
-            Nombre, 
-            Descripcion, 
-            ExtraDescripcion || null, 
-            Precio, 
-            Codigo_numeral, 
-            Codigo_japon, 
-            Estanteria, 
-            Caja, 
-            Stock || 0, 
-            Apartado || 0, 
-            id_marca
-        ]);
+    try {
+        const [rows]: any = await pool.query(
+            'CALL sp_modificar_producto(?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                id,
+                Nombre,
+                Descripcion,
+                ExtraDescripcion || null,
+                Precio,
+                Codigo_numeral,
+                Codigo_japon,
+                id_estanteria,
+                id_caja,
+                Stock || 0,
+                Apartado || 0,
+                id_marca
+            ]
+        );
+
         return rows;
+
+    } catch (error: any) {
+
+        if (
+            error.sqlMessage &&
+            error.sqlMessage.includes('Error:')
+        ) {
+            throw new Error(error.sqlMessage);
+        }
+
+        throw new Error(
+            'Error al modificar el producto en la base de datos.'
+        );
     }
+}
     static async obtenerProductos(pagina: number = 1, limite: number = 6) {
         const offset = (pagina - 1) * limite;
 
@@ -148,5 +200,174 @@ static async obtenerProductoPorId(id: number) {
 
     return rows;
 }
-    
+    static async obtenerEstanterias() {
+    const [rows]: any = await pool.query(`
+        SELECT
+            id,
+            codigo,
+            descripcion
+        FROM estanterias
+        WHERE estatus = 1
+        ORDER BY CAST(codigo AS UNSIGNED), codigo
+    `);
+
+    return rows;
+}
+
+static async obtenerCajas() {
+    const [rows]: any = await pool.query(`
+        SELECT
+            id,
+            codigo,
+            descripcion
+        FROM cajas
+        WHERE estatus = 1
+        ORDER BY codigo
+    `);
+
+    return rows;
+}
+static async agregarEstanteria(
+    codigo: string,
+    descripcion: string | null
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_agregar_estanteria(?, ?, @p_mensaje)',
+            [
+                codigo.trim(),
+                descripcion?.trim() || null
+            ]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
+}
+
+static async desactivarEstanteria(
+    idEstanteria: number
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_desactivar_estanteria(?, @p_mensaje)',
+            [idEstanteria]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
+}
+
+static async agregarCaja(
+    codigo: string,
+    descripcion: string | null
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_agregar_caja(?, ?, @p_mensaje)',
+            [
+                codigo.trim().toUpperCase(),
+                descripcion?.trim() || null
+            ]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
+}
+
+static async desactivarCaja(
+    idCaja: number
+): Promise<string> {
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.query(
+            'CALL sp_desactivar_caja(?, @p_mensaje)',
+            [idCaja]
+        );
+
+        const [rows]: any = await connection.query(
+            'SELECT @p_mensaje AS mensaje'
+        );
+
+        return rows[0]?.mensaje;
+
+    } finally {
+        connection.release();
+    }
+}
+static async consultarUbicaciones(
+    tipo: string,
+    estatus: string,
+    pagina: number,
+    limite: number
+) {
+    try {
+        const [rows]: any = await pool.query(
+            'CALL sp_consultar_ubicaciones(?, ?, ?, ?)',
+            [
+                tipo,
+                estatus,
+                pagina,
+                limite
+            ]
+        );
+
+        const ubicaciones = rows[0] || [];
+        const paginacion = rows[1]?.[0] || {
+            total: 0,
+            pagina,
+            limite,
+            total_paginas: 0
+        };
+
+        return {
+            ubicaciones,
+            paginacion
+        };
+
+    } catch (error: any) {
+
+        if (
+            error.sqlMessage &&
+            error.sqlMessage.includes('Error:')
+        ) {
+            throw new Error(error.sqlMessage);
+        }
+
+        throw new Error(
+            'Error al consultar las ubicaciones.'
+        );
+    }
+}
 }
