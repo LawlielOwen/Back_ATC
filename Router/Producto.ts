@@ -1,11 +1,12 @@
 import {Router} from 'express';
 import {ProductoController} from "../Controller/ProductoController"
+import { ExcelController } from '../Controller/ExcelController';
 const router = Router();
 
 router.get('/productos',ProductoController.getProductos);
 router.get('/productos/count',ProductoController.contarProductos);
 router.get('/productos/buscar',ProductoController.buscaryfiltrarProductos);
-
+router.get('/productos/reportes/inventario',ExcelController.reporteInventario);
 router.get('/productos/codigo', ProductoController.buscarProductoPorCodigo);
 router.get('/productos/ubicaciones/estanterias',ProductoController.obtenerEstanterias);
 router.get('/productos/ubicaciones/cajas',ProductoController.obtenerCajas);
