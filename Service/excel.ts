@@ -45,10 +45,13 @@ const aplicarTono = (celda: ExcelJS.Cell, tono: Tono) => {
   celda.fill = relleno(TONOS[tono].fondo);
 };
 
-/** Encabezado de la fila 1: color por columna, texto envuelto y fila alta. */
-function estilizarEncabezado(hoja: ExcelJS.Worksheet, colorDe: (col: number) => string) {
+function estilizarEncabezado(
+  hoja: ExcelJS.Worksheet,
+  colorDe: (col: number) => string,
+  altura = 38
+) {
   const fila = hoja.getRow(1);
-  fila.height = 38;
+  fila.height = altura;
   fila.eachCell({ includeEmpty: false }, (celda, col) => {
     celda.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
     celda.fill = relleno(colorDe(col));
@@ -131,226 +134,278 @@ export class ExcelService {
     return rows;
   }
 
-  private static crearHojaResumen(workbook: ExcelJS.Workbook, productos: any[]) {
-    const hoja = workbook.addWorksheet('Resumen', {
-      views: [{ showGridLines: false }],
-      properties: { tabColor: { argb: COLOR.azul } },
-    });
+private static crearHojaResumen(workbook: ExcelJS.Workbook, productos: any[]) {
+  const hoja = workbook.addWorksheet('Resumen', {
+    views: [{ showGridLines: false }],
+    properties: { tabColor: { argb: COLOR.azul } },
+  });
 
-    hoja.columns = [{ width: 44 }, { width: 22 }];
+  hoja.columns = [{ width: 44 }, { width: 22 }];
 
-    const suma = (campo: string) =>
-      productos.reduce((total, p) => total + Number(p[campo] || 0), 0);
+  const suma = (campo: string) =>
+    productos.reduce((total, p) => total + Number(p[campo] || 0), 0);
 
-    const totalProductos = productos.length;
-    const productosActivos = productos.filter(p => Number(p.Estatus) === 1).length;
-    const productosConStock = productos.filter(p => Number(p.Stock) > 0).length;
-    const productosSinStock = productos.filter(p => Number(p.Stock) <= 0).length;
-    const productosSinUbicacion = productos.filter(p => !p.Estanteria || !p.Caja).length;
+  const totalProductos = productos.length;
+  const productosActivos = productos.filter(p => Number(p.Estatus) === 1).length;
+  const productosConStock = productos.filter(p => Number(p.Stock) > 0).length;
+  const productosSinStock = productos.filter(p => Number(p.Stock) <= 0).length;
+  const productosSinUbicacion = productos.filter(p => !p.Estanteria || !p.Caja).length;
 
-    const stockDisponible = suma('Stock');
-    const apartadoSinPedido = suma('ApartadoLibre');
-    const comprometidoPedidos = suma('ApartadoComprometido');
-    const totalApartado = suma('Apartado');
-    const existenciaFisica = suma('ExistenciaFisica');
-    const valorComercialDisponible = productos.reduce(
-      (total, p) => total + Number(p.Stock || 0) * Number(p.Precio || 0), 0
-    );
+  const stockDisponible = suma('Stock');
+  const apartadoSinPedido = suma('ApartadoLibre');
+  const comprometidoPedidos = suma('ApartadoComprometido');
+  const totalApartado = suma('Apartado');
+  const existenciaFisica = suma('ExistenciaFisica');
+  const valorComercialDisponible = productos.reduce(
+    (total, p) => total + Number(p.Stock || 0) * Number(p.Precio || 0), 0
+  );
 
-    // Título
-    hoja.mergeCells('A1:B2');
-    const titulo = hoja.getCell('A1');
-    titulo.value = 'REPORTE GENERAL DE INVENTARIO';
-    titulo.font = { size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
-    titulo.fill = relleno(COLOR.azulOscuro);
-    titulo.alignment = { vertical: 'middle', horizontal: 'center' };
+  // Título
+  hoja.mergeCells('A1:B2');
+  const titulo = hoja.getCell('A1');
+  titulo.value = 'REPORTE GENERAL DE INVENTARIO';
+  titulo.font = { size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
+  titulo.fill = relleno(COLOR.azulOscuro);
+  titulo.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    hoja.mergeCells('A3:B3');
-    const fecha = hoja.getCell('A3');
-    fecha.value = `Generado: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`;
-    fecha.font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
-    fecha.alignment = { horizontal: 'center', vertical: 'middle' };
-    hoja.getRow(3).height = 20;
+  hoja.mergeCells('A3:B3');
+  const fecha = hoja.getCell('A3');
+  fecha.value = `Generado: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`;
+  fecha.font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
+  fecha.alignment = { horizontal: 'center', vertical: 'middle' };
+  hoja.getRow(3).height = 20;
 
-    let fila = 5;
-    let contador = 0;
+  let fila = 5;
+  let contador = 0;
 
-    const seccion = (texto: string, color: string) => {
-      hoja.mergeCells(`A${fila}:B${fila}`);
-      const celda = hoja.getCell(`A${fila}`);
-      celda.value = texto;
-      celda.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-      celda.fill = relleno(color);
-      celda.alignment = { vertical: 'middle', indent: 1 };
-      hoja.getRow(fila).height = 24;
-      fila++;
-      contador = 0;
-    };
-
-    const indicador = (
-      etiqueta: string,
-      valor: number,
-      opciones: { formato?: string; tono?: Tono; negrita?: boolean } = {}
-    ) => {
-      const a = hoja.getCell(`A${fila}`);
-      const b = hoja.getCell(`B${fila}`);
-
-      a.value = etiqueta;
-      b.value = valor;
-      b.numFmt = opciones.formato ?? '#,##0';
-
-      [a, b].forEach((c) => {
-        c.border = BORDES;
-        c.font = { size: 11, bold: !!opciones.negrita, color: { argb: COLOR.texto } };
-        c.alignment = { vertical: 'middle' };
-        if (contador % 2 === 1) c.fill = relleno(COLOR.cebra);
-      });
-      a.alignment = { vertical: 'middle', indent: 1 };
-      b.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
-
-      // Solo se resalta si el valor llama la atención (> 0)
-      if (opciones.tono && valor > 0) aplicarTono(b, opciones.tono);
-
-      hoja.getRow(fila).height = 22;
-      fila++;
-      contador++;
-    };
-
-    seccion('PRODUCTOS', COLOR.azulOscuro);
-    indicador('Productos registrados', totalProductos);
-    indicador('Productos activos', productosActivos);
-    indicador('Productos con stock libre', productosConStock);
-    indicador('Productos sin stock libre', productosSinStock, { tono: 'rojo' });
-    indicador('Productos sin ubicación completa', productosSinUbicacion, { tono: 'naranja' });
-
-    fila++; // espacio entre secciones
-
-    seccion('UNIDADES', COLOR.azul);
-    indicador('Unidades libres', stockDisponible);
-    indicador('Apartadas sin pedido', apartadoSinPedido, { tono: 'azul' });
-    indicador('Comprometidas en pedidos', comprometidoPedidos, { tono: 'ambar' });
-    indicador('Total unidades apartadas', totalApartado);
-    indicador('Existencia física total', existenciaFisica, { negrita: true });
-
+  const seccion = (texto: string, color: string) => {
+    hoja.mergeCells(`A${fila}:B${fila}`);
+    const celda = hoja.getCell(`A${fila}`);
+    celda.value = texto;
+    celda.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    celda.fill = relleno(color);
+    celda.alignment = { vertical: 'middle', indent: 1 };
+    hoja.getRow(fila).height = 24;
     fila++;
+    contador = 0;
+  };
 
-    seccion('VALOR', COLOR.verde);
-    indicador('Valor comercial disponible', valorComercialDisponible, {
-      formato: '$#,##0.00',
-      negrita: true,
+  const indicador = (
+    etiqueta: string,
+    valor: number,
+    opciones: { formato?: string; tono?: Tono; negrita?: boolean } = {}
+  ) => {
+    const a = hoja.getCell(`A${fila}`);
+    const b = hoja.getCell(`B${fila}`);
+
+    a.value = etiqueta;
+    b.value = valor;
+    b.numFmt = opciones.formato ?? '#,##0';
+
+    [a, b].forEach((c) => {
+      c.border = BORDES;
+      c.font = { size: 11, bold: !!opciones.negrita, color: { argb: COLOR.texto } };
+      c.alignment = { vertical: 'middle' };
+      if (contador % 2 === 1) c.fill = relleno(COLOR.cebra);
+    });
+    a.alignment = { vertical: 'middle', indent: 1 };
+    b.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+
+    // Solo se resalta si el valor llama la atención (> 0)
+    if (opciones.tono && valor > 0) aplicarTono(b, opciones.tono);
+
+    hoja.getRow(fila).height = 22;
+    fila++;
+    contador++;
+  };
+
+  const definicion = (termino: string, explicacion: string) => {
+    hoja.mergeCells(`A${fila}:B${fila}`);
+    const celda = hoja.getCell(`A${fila}`);
+    celda.value = {
+      richText: [
+        { text: `${termino}: `, font: { bold: true, size: 10, color: { argb: COLOR.texto } } },
+        { text: explicacion, font: { size: 10, color: { argb: 'FF64748B' } } },
+      ],
+    };
+    celda.alignment = { vertical: 'middle', wrapText: true, indent: 1 };
+    celda.border = BORDES;
+    hoja.getRow(fila).height = 34;
+    fila++;
+  };
+
+  seccion('PRODUCTOS', COLOR.azulOscuro);
+  indicador('Productos registrados', totalProductos);
+  indicador('Productos activos', productosActivos);
+  indicador('Productos con stock libre', productosConStock);
+  indicador('Productos sin stock libre', productosSinStock, { tono: 'rojo' });
+  indicador('Productos sin ubicación completa', productosSinUbicacion, { tono: 'naranja' });
+
+  fila++; // espacio entre secciones
+
+  seccion('UNIDADES', COLOR.azul);
+  indicador('Unidades libres', stockDisponible);
+  indicador('Apartadas sin pedido', apartadoSinPedido, { tono: 'azul' });
+  indicador('Comprometidas en pedidos', comprometidoPedidos, { tono: 'ambar' });
+  indicador('Total unidades apartadas', totalApartado);
+  indicador('Existencia física total', existenciaFisica, { negrita: true });
+
+  fila++;
+
+  seccion('VALOR', COLOR.verde);
+  indicador('Valor comercial disponible', valorComercialDisponible, {
+    formato: '$#,##0.00',
+    negrita: true,
+  });
+
+  fila++;
+
+  // Glosario
+  seccion('¿CÓMO SE CALCULA?', COLOR.gris);
+  definicion('Unidades libres', 'suma del Stock Libre de todos los productos.');
+  definicion('Apartadas sin pedido', 'reservas activas que no están ligadas a un pedido.');
+  definicion('Comprometidas en pedidos', 'reservas activas ligadas a un pedido.');
+  definicion('Total unidades apartadas', 'apartadas sin pedido + comprometidas en pedidos.');
+  definicion('Existencia física total', 'unidades libres + total de unidades apartadas.');
+  definicion(
+    'Valor comercial disponible',
+    'suma de (Stock Libre × Precio) de cada producto. No incluye las unidades apartadas.'
+  );
+
+  configurarImpresion(hoja);
+}
+
+private static crearHojaInventario(workbook: ExcelJS.Workbook, productos: any[]) {
+  const hoja = workbook.addWorksheet('Inventario', {
+    views: [{ state: 'frozen', xSplit: 3, ySplit: 1 }], // congela encabezado + 3 primeras columnas
+    properties: { tabColor: { argb: COLOR.azulOscuro } },
+  });
+
+  hoja.columns = [
+    { header: 'Código Numeral', key: 'codigoNumeral', width: 18 },
+    { header: 'Código Japón', key: 'codigoJapon', width: 18 },
+    { header: 'Producto', key: 'producto', width: 28 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Marca', key: 'marca', width: 20 },
+    { header: 'Estantería', key: 'estanteria', width: 15 },
+    { header: 'Caja', key: 'caja', width: 12 },
+    { header: 'Stock Libre', key: 'stock', width: 14 },
+    { header: 'Apartado sin Pedido', key: 'apartadoLibre', width: 16 },
+    { header: 'Comprometido en Pedidos', key: 'comprometido', width: 18 },
+    { header: 'Total Apartado', key: 'apartado', width: 14 },
+    { header: 'Existencia Física', key: 'existencia', width: 14 },
+    { header: 'Disponibilidad', key: 'disponibilidad', width: 32 },
+    { header: 'Precio', key: 'precio', width: 15 },
+    { header: 'Valor Comercial Disponible\n(Stock Libre × Precio)', key: 'valor', width: 22 },
+    { header: 'Estatus', key: 'estatus', width: 13 },
+  ];
+
+  const CENTRADAS = [6, 7, 8, 9, 10, 11, 12, 16];
+  const CONTEOS = [8, 9, 10, 11, 12];
+  const DINERO = [14, 15];
+
+  productos.forEach((p: any, i: number) => {
+    const stock = Number(p.Stock || 0);
+    const apartado = Number(p.Apartado || 0);
+    const precio = Number(p.Precio || 0);
+
+    let disponibilidad = 'Disponible';
+    let tono: Tono = 'verde';
+    if (stock <= 0) {
+      disponibilidad = 'Sin disponibilidad';
+      tono = 'rojo';
+    } else if (apartado > 0) {
+      disponibilidad = 'Con inventario comprometido';
+      tono = 'ambar';
+    }
+
+    const fila = hoja.addRow({
+      codigoNumeral: p.Codigo_numeral || '',
+      codigoJapon: p.Codigo_japon || '',
+      producto: p.Nombre || '',
+      descripcion: p.Descripcion || '',
+      marca: p.Marca || '',
+      estanteria: p.Estanteria || 'Sin ubicación',
+      caja: p.Caja || 'Sin ubicación',
+      stock,
+      apartadoLibre: Number(p.ApartadoLibre || 0),
+      comprometido: Number(p.ApartadoComprometido || 0),
+      apartado,
+      existencia: Number(p.ExistenciaFisica || 0),
+      disponibilidad,
+      precio,
+      valor: stock * precio,
+      estatus: Number(p.Estatus) === 1 ? 'Activo' : 'Inactivo',
     });
 
-    configurarImpresion(hoja);
-  }
+    // Valor Comercial = Stock Libre (col H) × Precio (col N), visible como fórmula en Excel
+    fila.getCell(15).value = {
+      formula: `H${fila.number}*N${fila.number}`,
+      result: stock * precio,
+    };
 
+    estilizarFila(fila, i);
 
-  private static crearHojaInventario(workbook: ExcelJS.Workbook, productos: any[]) {
-    const hoja = workbook.addWorksheet('Inventario', {
-      views: [{ state: 'frozen', xSplit: 3, ySplit: 1 }], // congela encabezado + 3 primeras columnas
-      properties: { tabColor: { argb: COLOR.azulOscuro } },
+    // Alineaciones y formatos por tipo de columna
+    CENTRADAS.forEach(c => (fila.getCell(c).alignment = { vertical: 'middle', horizontal: 'center' }));
+    CONTEOS.forEach(c => (fila.getCell(c).numFmt = '#,##0'));
+    DINERO.forEach(c => {
+      fila.getCell(c).numFmt = '$#,##0.00';
+      fila.getCell(c).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
     });
+    fila.getCell(4).alignment = { vertical: 'middle', wrapText: true }; // descripción
 
-    hoja.columns = [
-      { header: 'Código Numeral', key: 'codigoNumeral', width: 18 },
-      { header: 'Código Japón', key: 'codigoJapon', width: 18 },
-      { header: 'Producto', key: 'producto', width: 28 },
-      { header: 'Descripción', key: 'descripcion', width: 40 },
-      { header: 'Marca', key: 'marca', width: 20 },
-      { header: 'Estantería', key: 'estanteria', width: 15 },
-      { header: 'Caja', key: 'caja', width: 12 },
-      { header: 'Stock Libre', key: 'stock', width: 14 },
-      { header: 'Apartado sin Pedido', key: 'apartadoLibre', width: 16 },
-      { header: 'Comprometido en Pedidos', key: 'comprometido', width: 18 },
-      { header: 'Total Apartado', key: 'apartado', width: 14 },
-      { header: 'Existencia Física', key: 'existencia', width: 14 },
-      { header: 'Disponibilidad', key: 'disponibilidad', width: 32 },
-      { header: 'Precio', key: 'precio', width: 15 },
-      { header: 'Valor Comercial Disponible', key: 'valor', width: 20 },
-      { header: 'Estatus', key: 'estatus', width: 13 },
-    ];
+    // Resaltados por significado
+    aplicarTono(fila.getCell(13), tono);
+    fila.getCell(13).alignment = { vertical: 'middle', horizontal: 'center' };
 
-    const CENTRADAS = [6, 7, 8, 9, 10, 11, 12, 16];
-    const CONTEOS = [8, 9, 10, 11, 12];
-    const DINERO = [14, 15];
+    if (stock <= 0) {
+      fila.getCell(8).font = { bold: true, size: 11, color: { argb: TONOS.rojo.texto } };
+    }
+    if (!p.Estanteria) {
+      fila.getCell(6).font = { italic: true, size: 11, color: { argb: TONOS.rojo.texto } };
+    }
+    if (!p.Caja) {
+      fila.getCell(7).font = { italic: true, size: 11, color: { argb: TONOS.rojo.texto } };
+    }
+    aplicarTono(fila.getCell(16), Number(p.Estatus) === 1 ? 'verde' : 'gris');
+    fila.getCell(16).alignment = { vertical: 'middle', horizontal: 'center' };
+  });
 
-    productos.forEach((p: any, i: number) => {
-      const stock = Number(p.Stock || 0);
-      const apartado = Number(p.Apartado || 0);
-      const precio = Number(p.Precio || 0);
-
-      let disponibilidad = 'Disponible';
-      let tono: Tono = 'verde';
-      if (stock <= 0) {
-        disponibilidad = 'Sin disponibilidad';
-        tono = 'rojo';
-      } else if (apartado > 0) {
-        disponibilidad = 'Con inventario comprometido';
-        tono = 'ambar';
-      }
-
-      const fila = hoja.addRow({
-        codigoNumeral: p.Codigo_numeral || '',
-        codigoJapon: p.Codigo_japon || '',
-        producto: p.Nombre || '',
-        descripcion: p.Descripcion || '',
-        marca: p.Marca || '',
-        estanteria: p.Estanteria || 'Sin ubicación',
-        caja: p.Caja || 'Sin ubicación',
-        stock,
-        apartadoLibre: Number(p.ApartadoLibre || 0),
-        comprometido: Number(p.ApartadoComprometido || 0),
-        apartado,
-        existencia: Number(p.ExistenciaFisica || 0),
-        disponibilidad,
-        precio,
-        valor: stock * precio,
-        estatus: Number(p.Estatus) === 1 ? 'Activo' : 'Inactivo',
-      });
-
-      estilizarFila(fila, i);
-
-      // Alineaciones y formatos por tipo de columna
-      CENTRADAS.forEach(c => (fila.getCell(c).alignment = { vertical: 'middle', horizontal: 'center' }));
-      CONTEOS.forEach(c => (fila.getCell(c).numFmt = '#,##0'));
-      DINERO.forEach(c => {
-        fila.getCell(c).numFmt = '$#,##0.00';
-        fila.getCell(c).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
-      });
-      fila.getCell(4).alignment = { vertical: 'middle', wrapText: true }; // descripción
-
-      // Resaltados por significado
-      aplicarTono(fila.getCell(13), tono);
-      fila.getCell(13).alignment = { vertical: 'middle', horizontal: 'center' };
-
-      if (stock <= 0) {
-        fila.getCell(8).font = { bold: true, size: 11, color: { argb: TONOS.rojo.texto } };
-      }
-      if (!p.Estanteria) {
-        fila.getCell(6).font = { italic: true, size: 11, color: { argb: TONOS.rojo.texto } };
-      }
-      if (!p.Caja) {
-        fila.getCell(7).font = { italic: true, size: 11, color: { argb: TONOS.rojo.texto } };
-      }
-      aplicarTono(fila.getCell(16), Number(p.Estatus) === 1 ? 'verde' : 'gris');
-      fila.getCell(16).alignment = { vertical: 'middle', horizontal: 'center' };
-    });
-
-    // Encabezados con color por grupo de columnas
-    estilizarEncabezado(hoja, (col) => {
+  // Encabezados con color por grupo de columnas (altura 50 por el subtítulo del valor comercial)
+  estilizarEncabezado(
+    hoja,
+    (col) => {
       if (col <= 5) return COLOR.azulOscuro; // identificación
       if (col <= 7) return COLOR.teal;       // ubicación
       if (col <= 13) return COLOR.azul;      // inventario
       if (col <= 15) return COLOR.verde;     // comercial
       return COLOR.gris;                     // estatus
-    });
+    },
+    50
+  );
 
-    hoja.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: Math.max(hoja.rowCount, 1), column: 16 },
-    };
+  // Notas que aparecen al pasar el mouse sobre el encabezado
+  const NOTAS_ENCABEZADO: Record<number, string> = {
+    8:  'Stock Libre: unidades disponibles para vender, sin contar lo apartado.',
+    9:  'Apartado sin Pedido: unidades reservadas que aún no pertenecen a un pedido.',
+    10: 'Comprometido en Pedidos: unidades reservadas para pedidos existentes.',
+    11: 'Total Apartado = Apartado sin Pedido + Comprometido en Pedidos.',
+    12: 'Existencia Física = Stock Libre + Total Apartado (lo que hay físicamente en almacén).',
+    15: 'Valor Comercial Disponible = Stock Libre × Precio.\nNo incluye unidades apartadas ni comprometidas.',
+  };
 
-    configurarImpresion(hoja);
-  }
+  Object.entries(NOTAS_ENCABEZADO).forEach(([col, texto]) => {
+    hoja.getRow(1).getCell(Number(col)).note = texto;
+  });
+
+  hoja.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: Math.max(hoja.rowCount, 1), column: 16 },
+  };
+
+  configurarImpresion(hoja);
+}
 
   private static crearHojaAlertas(workbook: ExcelJS.Workbook, productos: any[]) {
     const hoja = workbook.addWorksheet('Alertas', {
