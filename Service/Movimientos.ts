@@ -16,7 +16,7 @@ export class MovimientoService {
         }
 
     }
- static async registrarSalidaProducto(
+static async registrarSalidaProducto(
     codigo: string,
     cantidad: number,
     destino: string,
@@ -40,9 +40,16 @@ export class MovimientoService {
         ]
     );
 
-    return rows;
-}
-    static async estadisticaMensual() {
+    const resultado = rows[0]?.[0];
+
+    if (!resultado || Number(resultado.exito) !== 1) {
+        throw new Error(
+            resultado?.mensaje || 'No se pudo confirmar la salida.'
+        );
+    }
+
+    return resultado;
+}    static async estadisticaMensual() {
         const query = `CALL  sp_estadisticas_mes_actual()`;
         const [rows]: any = await pool.query(query);
         return rows[0];
