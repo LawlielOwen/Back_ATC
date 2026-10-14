@@ -1,11 +1,12 @@
 // NO TOCAR
 const pdfjsLib = require('pdfjs-dist/build/pdf.js');
 
-export async function leerPdfSat(bufferArchivo: Buffer | ArrayBuffer): Promise<string> {
+export async function leerPdfSatEstructurado(bufferArchivo: Buffer | ArrayBuffer) {
     const uint8Array = new Uint8Array(bufferArchivo as ArrayBuffer);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
 
     let textoCompleto: string = '';
+    const itemsPorPagina: any[][] = [];
 
     for (let numPagina = 1; numPagina <= pdf.numPages; numPagina++) {
         const pagina = await pdf.getPage(numPagina);
@@ -14,10 +15,19 @@ export async function leerPdfSat(bufferArchivo: Buffer | ArrayBuffer): Promise<s
         let xAnterior: number | null = null;
         let yAnterior: number | null = null;
         let lineaActual: string = '';
+        const itemsPagina: any[] = [];
 
         for (const item of contenido.items as any[]) {
             const x: number = item.transform[4];
             const y: number = item.transform[5];
+
+            itemsPagina.push({
+                str: item.str,
+                x,
+                y,
+                width: item.width || 0,
+                pagina: numPagina
+            });
 
             if (yAnterior !== null && Math.abs(y - yAnterior) > 5) {
                 textoCompleto += lineaActual + '\n';
@@ -32,7 +42,11 @@ export async function leerPdfSat(bufferArchivo: Buffer | ArrayBuffer): Promise<s
         }
 
         textoCompleto += lineaActual + '\n';
+        itemsPorPagina.push(itemsPagina);
     }
 
-    return textoCompleto;
+    return {
+        texto: textoCompleto,
+        itemsPorPagina
+    };
 }

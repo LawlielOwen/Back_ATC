@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { ClienteService } from "../Service/Cliente_s";
 import fs from 'fs';
 import path from 'path';
-const { leerPdfSatEstructurado } = require('./pdfHelper.js');
+import { leerPdfSatEstructurado } from './pdfHelper';
 import pdfParse = require('pdf-parse');
 function extraerRegimenPorTextoPlano(textoLimpio: string): string {
     const regexBloque = /Reg[ií]menes?:\s*(?:R[eé]gimen\s*Fecha\s*Inicio\s*Fecha\s*Fin\s*)?([\s\S]*?)(?:Obligaciones:|$)/i;
